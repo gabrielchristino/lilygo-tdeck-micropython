@@ -50,7 +50,7 @@ This driver supports:
 
 """
 
-from math import sin, cos
+from math import sin, cos, atan2, pi
 
 #
 # This allows sphinx to build the docs
@@ -942,6 +942,195 @@ class ST7789:
                 pass
 
         return width
+
+    def _draw_circle_points(self, cx, cy, x, y, color):
+        """
+        Draw the 8 points of a circle octant.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            x (int): x offset from center
+            y (int): y offset from center
+            color (int): 565 encoded color
+        """
+        self.pixel(cx + x, cy + y, color)
+        self.pixel(cx - x, cy + y, color)
+        self.pixel(cx + x, cy - y, color)
+        self.pixel(cx - x, cy - y, color)
+        self.pixel(cx + y, cy + x, color)
+        self.pixel(cx - y, cy + x, color)
+        self.pixel(cx + y, cy - x, color)
+        self.pixel(cx - y, cy - x, color)
+
+    def circle(self, cx, cy, r, color):
+        """
+        Draw a circle.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            r (int): Radius
+            color (int): 565 encoded color
+        """
+        x = 0
+        y = r
+        d = 3 - 2 * r
+        self._draw_circle_points(cx, cy, x, y, color)
+        
+        while y >= x:
+            x += 1
+            if d > 0:
+                y -= 1
+                d = d + 4 * (x - y) + 10
+            else:
+                d = d + 4 * x + 6
+            self._draw_circle_points(cx, cy, x, y, color)
+
+    def fill_circle(self, cx, cy, r, color):
+        """
+        Draw a filled circle using an optimized algorithm.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            r (int): Radius
+            color (int): 565 encoded color
+        """
+        x = 0
+        y = r
+        d = 3 - 2 * r
+        
+        def draw_lines(x, y):
+            # Desenha linhas horizontais para preencher o círculo
+            self.hline(cx - x, cy + y, 2*x + 1, color)  # Baixo
+            if y != 0:  # Evita duplicar a linha central
+                self.hline(cx - x, cy - y, 2*x + 1, color)  # Cima
+            if x != y:
+                self.hline(cx - y, cy + x, 2*y + 1, color)  # Direita
+                if x != 0:  # Evita duplicar a linha central
+                    self.hline(cx - y, cy - x, 2*y + 1, color)  # Esquerda
+        
+        draw_lines(x, y)
+        
+        while y >= x:
+            x += 1
+            if d > 0:
+                y -= 1
+                d = d + 4 * (x - y) + 10
+            else:
+                d = d + 4 * x + 6
+            draw_lines(x, y)
+
+    def _draw_arc_points(self, cx, cy, x, y, color, start_angle, end_angle):
+        """
+        Draw points of an arc that are within the specified angle range.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            x (int): x offset from center
+            y (int): y offset from center
+            color (int): 565 encoded color
+            start_angle (float): Start angle in radians (0 to 2*pi)
+            end_angle (float): End angle in radians (0 to 2*pi)
+        """
+        # Converter coordenadas para ângulos em radianos
+        def get_angle(px, py):
+            angle = atan2(py, px)
+            if angle < 0:
+                angle += 2 * pi
+            return angle
+
+        points = [
+            (x, y), (-x, y), (x, -y), (-x, -y),
+            (y, x), (-y, x), (y, -x), (-y, -x)
+        ]
+        
+        for dx, dy in points:
+            angle = get_angle(dx, dy)
+            if start_angle <= angle <= end_angle:
+                self.pixel(cx + dx, cy + dy, color)
+
+    def arc(self, cx, cy, r, color, start_angle=0, end_angle=2*pi):
+        """
+        Draw an arc.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            r (int): Radius
+            color (int): 565 encoded color
+            start_angle (float): Start angle in radians (0 to 2*pi)
+            end_angle (float): End angle in radians (0 to 2*pi)
+        """
+        x = 0
+        y = r
+        d = 3 - 2 * r
+
+        self._draw_arc_points(cx, cy, x, y, color, start_angle, end_angle)
+        
+        while y >= x:
+            x += 1
+            if d > 0:
+                y -= 1
+                d = d + 4 * (x - y) + 10
+            else:
+                d = d + 4 * x + 6
+            self._draw_arc_points(cx, cy, x, y, color, start_angle, end_angle)
+
+    def fill_arc(self, cx, cy, r, color, start_angle=0, end_angle=2*pi):
+        """
+        Draw a filled arc.
+        
+        Args:
+            cx (int): Center x coordinate
+            cy (int): Center y coordinate
+            r (int): Radius
+            color (int): 565 encoded color
+            start_angle (float): Start angle in radians (0 to 2*pi)
+            end_angle (float): End angle in radians (0 to 2*pi)
+        """
+        def is_angle_in_range(angle):
+            angle = angle % (2 * pi)
+            start = start_angle % (2 * pi)
+            end = end_angle % (2 * pi)
+            
+            if start <= end:
+                return start <= angle <= end
+            return angle >= start or angle <= end
+
+        x = 0
+        y = r
+        d = 3 - 2 * r
+        
+        # Função para desenhar linhas horizontais dentro do arco
+        def draw_lines(x, y):
+            for i in range(-x, x + 1):
+                angle = atan2(y, i)
+                if is_angle_in_range(angle):
+                    self.pixel(cx + i, cy + y, color)
+                    if y != 0:  # Evita duplicar a linha central
+                        self.pixel(cx + i, cy - y, color)
+            
+            if x != y:
+                for i in range(-y, y + 1):
+                    angle = atan2(x, i)
+                    if is_angle_in_range(angle):
+                        self.pixel(cx + i, cy + x, color)
+                        if x != 0:  # Evita duplicar a linha central
+                            self.pixel(cx + i, cy - x, color)
+        
+        draw_lines(x, y)
+        
+        while y >= x:
+            x += 1
+            if d > 0:
+                y -= 1
+                d = d + 4 * (x - y) + 10
+            else:
+                d = d + 4 * x + 6
+            draw_lines(x, y)
 
     @micropython.native
     def polygon(self, points, x, y, color, angle=0, center_x=0, center_y=0):
