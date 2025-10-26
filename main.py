@@ -1,42 +1,58 @@
-print("main")
-import machine
-import st7789py as st7789
+# /home/gabriel/Documents/tdeck/teste base/main.py
+
+import time
 import tft_config as tft
+import st7789py as st7789
 from romfonts import vga1_8x8 as font
-
 from lib.material_components import Button
-from lib.st7789py import ST7789, color565
+from lib.touch import Touch # A classe Touch ainda é necessária para os tipos de evento
 
-# Setup display object as tft
-tft = tft.config()
-tft.fill(st7789.color565(128, 128, 128))
+# --- Inicialização ---
+# 1. Inicializa o display
+display = tft.config()
+display.fill(st7789.color565(128, 128, 128))
 
+# 2. Inicializa o touch usando a nova função
+touch = tft.config_touch()
+print("Display e Touch inicializados.")
 
+# --- Desenha a UI ---
 button1 = Button(
     x=50, y=50, w=140, h=40,
     text="Button 1",
-    bg_color=color565(33, 150, 243),
-    text_color=color565(255, 255, 255),
+    bg_color=st7789.color565(33, 150, 243),
+    text_color=st7789.color565(255, 255, 255),
     font=font,
-).draw(tft)
+).draw(display)
 
 button2 = Button(
     x=50, y=100, w=140, h=40,
     text="Button 2",
-    bg_color=color565(233, 30, 99),
-    text_color=color565(255, 255, 255),
+    bg_color=st7789.color565(233, 30, 99),
+    text_color=st7789.color565(255, 255, 255),
     font=font,
     border_radius=12,
-).draw(tft)
+).draw(display)
 
-button3 = Button(
-    x=50, y=150, w=140, h=40,
-    text="Button 3",
-    bg_color=color565(76, 175, 80),
-    text_color=color565(255, 255, 255),
-    font=font,
-    border_radius=0,
-).draw(tft)
+# --- Loop Principal ---
+while True:
+    event_type, x, y = touch.read()
+
+    if event_type == Touch.TAP:
+        print(f"Toque Rápido (Tap) em: ({x}, {y})")
+        # Verifica se o toque foi dentro de algum botão
+        if button1.contains(x, y):
+            print("Botão 1 pressionado!")
+        elif button2.contains(x, y):
+            print("Botão 2 pressionado!")
+
+    elif event_type == Touch.LONG_TAP:
+        print(f"Toque Longo (LongTap) em: ({x}, {y})")
+
+    elif event_type == Touch.DRAG:
+        print(f"Arrastando (Drag) para: ({x}, {y})")
+
+    time.sleep_ms(20)
 
 
 # import utime

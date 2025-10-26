@@ -1,5 +1,7 @@
 import machine
 import st7789py as st7789
+from touch import Touch
+
 _DISPLAY_HEIGHT = const(240)
 _DISPLAY_WIDTH = const(320)
 _DISPLAY_SPI_ID = const(1)
@@ -13,6 +15,12 @@ _DISPLAY_DC = const(11)
 _DISPLAY_BACKLIGHT = const(42)
 _DISPLAY_ROTATION = const(1)
 _PERIPHERAL = const(10)
+
+# --- Touch constants ---
+_TOUCH_I2C_SDA = const(18)
+_TOUCH_I2C_SCL = const(8)
+_TOUCH_I2C_INT = const(16)
+_TOUCH_I2C_FREQ = const(400000)
 
 def config():
     machine.Pin(_PERIPHERAL, machine.Pin.OUT, value=1)
@@ -30,3 +38,22 @@ def config():
                 cs=machine.Pin(_DISPLAY_CS, machine.Pin.OUT),
                 backlight=machine.Pin(_DISPLAY_BACKLIGHT, machine.Pin.OUT),
                 rotation=_DISPLAY_ROTATION)
+
+def config_touch():
+    """Inicializa e retorna o driver de touch GT911."""
+    # Garante que a alimentação dos periféricos está ligada
+    machine.Pin(_PERIPHERAL, machine.Pin.OUT, value=1)
+
+    i2c = machine.SoftI2C(
+        scl=machine.Pin(_TOUCH_I2C_SCL),
+        sda=machine.Pin(_TOUCH_I2C_SDA),
+        freq=_TOUCH_I2C_FREQ
+    )
+
+    return Touch(
+        i2c,
+        int_pin=_TOUCH_I2C_INT,
+        width=_DISPLAY_WIDTH,
+        height=_DISPLAY_HEIGHT,
+        swap_xy=True,
+        mirror_y=True)

@@ -179,6 +179,14 @@ class Button:
         self.font = font
         self.border_radius = border_radius
 
+    def contains(self, x, y):
+        """Check if a point (x, y) is inside the button's bounds.
+        
+        Returns:
+            bool: True if the point is inside, False otherwise.
+        """
+        return self.x <= x <= self.x + self.w and self.y <= y <= self.y + self.h
+
     def draw(self, display):
         """Draw the button on the display
         
