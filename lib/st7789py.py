@@ -47,6 +47,7 @@ This driver supports:
   - MAGENTA
   - YELLOW
   - WHITE
+  - GRAY
 
 """
 
@@ -127,6 +128,7 @@ CYAN = const(0x07FF)
 MAGENTA = const(0xF81F)
 YELLOW = const(0xFFE0)
 WHITE = const(0xFFFF)
+GRAY = const(0x8410)
 
 _ENCODE_PIXEL = const(">H")
 _ENCODE_PIXEL_SWAPPED = const("<H")
