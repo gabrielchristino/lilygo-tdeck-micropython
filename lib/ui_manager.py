@@ -3,6 +3,7 @@
 from lib.material_components import TextInput, NumericInput
 from lib.touch import Touch
 from lib.trackball import Trackball
+from lib.sound import SoundManager
 
 class UIManager:
     def __init__(self, display, touch, i2c, font):
@@ -13,6 +14,7 @@ class UIManager:
         self.inputs = []
         self.focused_input = None
         self.trackball = Trackball()
+        self.sound = SoundManager()
 
     def add_text_input(self, x, y, w, h, placeholder, bg_color, text_color):
         """Add a text input field"""
@@ -58,6 +60,7 @@ class UIManager:
                 if new_focus:
                     new_focus.focused = True
                     new_focus.draw(self.display)  # Redraw with focus border
+                    self.sound.play_click()  # Play sound when field is selected
 
                 self.focused_input = new_focus
 
@@ -94,6 +97,7 @@ class UIManager:
                     self.inputs[new_index].focused = True
                     self.inputs[new_index].draw(self.display)
                     self.focused_input = self.inputs[new_index]
+                    self.sound.play_navigation()  # Play sound when navigating with trackball
                 else:
                     self.focused_input = None
 
@@ -102,6 +106,7 @@ class UIManager:
             if self.focused_input.handle_key(b'\r'):
                 self.focused_input.draw_text(self.display)
                 print(f"Valor final do campo '{self.focused_input.placeholder}': {self.focused_input.value}")
+                self.sound.play_click()  # Play sound when confirming with trackball click
 
     def handle_keyboard(self, get_key_func):
         """Process keyboard input for focused field"""
@@ -113,5 +118,7 @@ class UIManager:
                     # Redraw only the text part for faster updates
                     self.focused_input.draw_text(self.display)
                     print(f"Campo '{self.focused_input.placeholder}' atualizado: '{self.focused_input.value}'")
+                    self.sound.play_keypress()  # Play sound when typing
                 elif key == b'\r':  # Enter key
                     print(f"Valor final do campo '{self.focused_input.placeholder}': {self.focused_input.value}")
+                    self.sound.play_click()  # Play sound when pressing Enter
