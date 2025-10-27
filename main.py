@@ -33,6 +33,9 @@ while True:
     # Processa eventos de toque
     ui_manager.handle_touch()
 
+    # Processa eventos do trackball
+    ui_manager.handle_trackball()
+
     # Processa entrada do teclado
     ui_manager.handle_keyboard(get_key)
 
