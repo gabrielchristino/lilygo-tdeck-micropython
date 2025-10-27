@@ -68,21 +68,24 @@ class InputBase:
     
     def draw(self, display):
         """Draw the input field"""
+        # Always clear the border area first to remove any previous focus highlight
+        display.fill_rect(self.x-2, self.y-2, self.w+4, self.h+4, st7789.color565(30, 30, 30))  # Use display background color
+
         # Draw focus border if focused
         if self.focused:
             if self.border_radius > 0:
-                self._draw_rounded_rect(display, self.x-2, self.y-2, self.w+4, self.h+4, 
+                self._draw_rounded_rect(display, self.x-2, self.y-2, self.w+4, self.h+4,
                                       self.border_radius+2, st7789.BLUE)
             else:
                 display.rect(self.x-2, self.y-2, self.w+4, self.h+4, st7789.BLUE)
-        
+
         # Draw main input field
         if self.border_radius > 0:
-            self._draw_rounded_rect(display, self.x, self.y, self.w, self.h, 
+            self._draw_rounded_rect(display, self.x, self.y, self.w, self.h,
                                   self.border_radius, self.bg_color)
         else:
             display.fill_rect(self.x, self.y, self.w, self.h, self.bg_color)
-            
+
         text = self.value if self.value else self.placeholder
         text_y = self.y + (self.h - self.font.HEIGHT) // 2
         text_color = self.text_color if self.value else st7789.GRAY
@@ -130,7 +133,7 @@ class NumericInput(InputBase):
         self._key_map = {
             'w': '1', 'e': '2', 'r': '3',
             's': '4', 'd': '5', 'f': '6',
-            'z': '7', 'x': '8', 'c': '9'
+            'z': '7', 'x': '8', 'c': '9', '0': '0'
         }
         
     def handle_key(self, key):

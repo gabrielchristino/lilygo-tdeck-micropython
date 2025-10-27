@@ -14,7 +14,7 @@ _DISPLAY_CS = const(12)
 _DISPLAY_DC = const(11)
 _DISPLAY_BACKLIGHT = const(42)
 _DISPLAY_ROTATION = const(1)
-_PERIPHERAL = const(10)
+PERIPHERAL_PIN = const(10)
 
 # --- Touch constants ---
 _TOUCH_I2C_SDA = const(18)
@@ -23,7 +23,7 @@ _TOUCH_I2C_INT = const(16)
 _TOUCH_I2C_FREQ = const(400000)
 
 def config():
-    machine.Pin(_PERIPHERAL, machine.Pin.OUT, value=1)
+    machine.Pin(PERIPHERAL_PIN, machine.Pin.OUT, value=1)
     return st7789.ST7789(machine.SPI(
                 _DISPLAY_SPI_ID,
                 baudrate=_DISPLAY_BAUDRATE,
@@ -39,16 +39,10 @@ def config():
                 backlight=machine.Pin(_DISPLAY_BACKLIGHT, machine.Pin.OUT),
                 rotation=_DISPLAY_ROTATION)
 
-def config_touch():
+def config_touch(i2c):
     """Inicializa e retorna o driver de touch GT911."""
     # Garante que a alimentação dos periféricos está ligada
-    machine.Pin(_PERIPHERAL, machine.Pin.OUT, value=1)
-
-    i2c = machine.SoftI2C(
-        scl=machine.Pin(_TOUCH_I2C_SCL),
-        sda=machine.Pin(_TOUCH_I2C_SDA),
-        freq=_TOUCH_I2C_FREQ
-    )
+    machine.Pin(PERIPHERAL_PIN, machine.Pin.OUT, value=1)
 
     return Touch(
         i2c,

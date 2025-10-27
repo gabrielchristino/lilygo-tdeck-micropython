@@ -1,61 +1,115 @@
 # /home/gabriel/Documents/tdeck/teste base/main.py
 
+import machine
 import time
 import tft_config as tft
 import st7789py as st7789
 from romfonts import vga1_8x8 as font
-from lib.material_components import Button
+from lib.material_components import TextInput, NumericInput
 from lib.touch import Touch # A classe Touch ainda é necessária para os tipos de evento
 
 # --- Inicialização ---
 # 1. Inicializa o display
 display = tft.config()
-display.fill(st7789.color565(128, 128, 128))
+display.fill(st7789.color565(30, 30, 30)) # Fundo cinza escuro
 
-# 2. Inicializa o touch usando a nova função
-touch = tft.config_touch()
-print("Display e Touch inicializados.")
+# 2. Inicializa I2C, Teclado e Touch
+
+# Pinos do teclado e I2C
+KBD_INT_PIN = 46
+KBD_I2C_ADDR = 0x55
+I2C_SCL_PIN = 8
+I2C_SDA_PIN = 18
+I2C_FREQ = 400000
+
+# Habilita a alimentação dos periféricos (teclado e touch)
+machine.Pin(tft.PERIPHERAL_PIN, machine.Pin.OUT, value=1)
+time.sleep(0.2)
+
+# Cria uma única instância I2C para ser compartilhada
+i2c = machine.SoftI2C(scl=machine.Pin(I2C_SCL_PIN), sda=machine.Pin(I2C_SDA_PIN), freq=I2C_FREQ)
+
+# Inicializa o touch, passando a instância I2C
+touch = tft.config_touch(i2c)
+
+# Configura o pino de interrupção do teclado
+kbd_int = machine.Pin(KBD_INT_PIN, machine.Pin.IN)
+
+def get_key():
+    """Lê um caractere do teclado via I2C."""
+    try:
+        key = i2c.readfrom(KBD_I2C_ADDR, 1)
+        if key != b'\x00':
+            print(f"Key read: {key}")  # Debug: mostra tecla lida
+            return key
+    except OSError as e:
+        print(f"Erro ao ler do teclado I2C: {e}")
+    return None
+
+print("Display, Touch e Teclado inicializados.")
 
 # --- Desenha a UI ---
-button1 = Button(
-    x=50, y=50, w=140, h=40,
-    text="Button 1",
-    bg_color=st7789.color565(33, 150, 243),
-    text_color=st7789.color565(255, 255, 255),
+text_input = TextInput(
+    x=40, y=50, w=240, h=40,
+    placeholder="Digite seu nome...",
+    bg_color=st7789.color565(66, 66, 66),
+    text_color=st7789.WHITE,
     font=font,
 ).draw(display)
 
-button2 = Button(
-    x=50, y=100, w=140, h=40,
-    text="Button 2",
-    bg_color=st7789.color565(233, 30, 99),
-    text_color=st7789.color565(255, 255, 255),
+numeric_input = NumericInput(
+    x=40, y=120, w=240, h=40,
+    placeholder="Digite sua idade...",
+    bg_color=st7789.color565(66, 66, 66),
+    text_color=st7789.WHITE,
     font=font,
-    border_radius=12,
 ).draw(display)
+
+# Lista de campos de entrada para gerenciar o foco
+inputs = [text_input, numeric_input]
+focused_input = None
 
 # --- Loop Principal ---
 while True:
+    # 1. Processa eventos de toque para dar foco aos campos
     event_type, x, y = touch.read()
 
     if event_type == Touch.TAP:
-        print(f"Toque Rápido (Tap) em: ({x}, {y})")
-        # Verifica se o toque foi dentro de algum botão
-        if button1.contains(x, y):
-            print("Botão 1 pressionado!")
-        elif button2.contains(x, y):
-            print("Botão 2 pressionado!")
+        new_focus = None
+        for inp in inputs:
+            # O método is_touched já existe na classe base InputBase
+            if inp.is_touched((x, y)):
+                new_focus = inp
+                break
+        
+        # Gerencia a mudança de foco e redesenha os campos
+        if new_focus != focused_input:
+            if focused_input:
+                focused_input.focused = False
+                focused_input.draw(display) # Redesenha sem a borda de foco
+            
+            if new_focus:
+                new_focus.focused = True
+                new_focus.draw(display) # Redesenha com a borda de foco
+            
+            focused_input = new_focus
 
-    elif event_type == Touch.LONG_TAP:
-        print(f"Toque Longo (LongTap) em: ({x}, {y})")
+    # 2. Processa a entrada do teclado se um campo estiver focado
+    if focused_input:
+        key = get_key()
+        if key:
+            # handle_key retorna True se o texto foi alterado
+            if focused_input.handle_key(key):
+                # Redesenha apenas o texto do campo para ser mais rápido
+                focused_input.draw_text(display)
+                print(f"Campo '{focused_input.placeholder}' atualizado: '{focused_input.value}'")
+            elif key == b'\r': # Tecla Enter
+                print(f"Valor final do campo '{focused_input.placeholder}': {focused_input.value}")
 
-    elif event_type == Touch.DRAG:
-        print(f"Arrastando (Drag) para: ({x}, {y})")
-
-    time.sleep_ms(20)
+    time.sleep_ms(20) # Pequeno delay para não sobrecarregar a CPU
 
 
-# import utime
+     import utime
 # import sound
 # import time
 
@@ -86,105 +140,4 @@ while True:
 # def do_connect():
 #     import network
 #     sta_if = network.WLAN(network.STA_IF)
-#     if not sta_if.isconnected():
-#         print('connecting to network...')
-#         sta_if.active(True)
-#         sta_if.connect('GTI-AP314', 'carsled100')
-#         while not sta_if.isconnected():
-#             pass
-#     print('network config:', sta_if.ifconfig())
-
-
-# def get_key():
-#     ch = i2c.readfrom(0x55, 1)
-#     #if ch != 0:
-#     return ch
-
-
-# def split_rows(input_string, row_delimiter='\r', chunk_size=40):
-#     rows = input_string.split(row_delimiter)
-
-#     for row in rows:
-#         for i in range(0, len(row), chunk_size):
-#             chunk = row[i:i+chunk_size]
-#             history_buf.append(chunk)
-
-#     if len(history_buf) > 11:
-#         del history_buf[0:len(history_buf)-11]
-
-#     # print(f"{history_buf=}")
-
-
-# def chat_history(buf):
-#     split_rows(buf.decode())
-
-#     for txt in history_buf:
-
-#         if txt[0:3] == 'me>':
-#             tft.text(font, txt[0:3], 0, (history_buf.index(txt)+1)*16, st7789.GREEN, st7789.BLACK)
-#             tft.text(font, txt[3:], 24, (history_buf.index(txt)+1)*16, st7789.WHITE, st7789.BLACK)
-#         elif txt[0:4] == 'oth>':
-#             tft.text(font, txt[0:4], 0, (history_buf.index(txt)+1)*16, st7789.RED, st7789.BLACK)
-#             tft.text(font, txt[4:], 24, (history_buf.index(txt)+1)*16, st7789.WHITE, st7789.BLACK)
-#         else:
-#             tft.text(font, txt, 0, (history_buf.index(txt)+1)*16, st7789.WHITE, st7789.BLACK)
-
-
-# def cmd_line(cmd_buf):
-#     for rows in cmd_buf:
-#         tft.text(font, cmd_buf.decode(), 40, 222, st7789.WHITE, st7789.BLACK)
-
-
-# def draw_navbar(bat, rssi=0):
-#     # draw navbar
-#     for i in range(0,318,8):
-#         tft.text(font, "-", i, 0, st7789.BLUE, st7789.BLUE)
-#     tft.text(font, f"bat:{bat}V", 0, 0, st7789.WHITE, st7789.BLUE)
-#     tft.text(font, f"rssi:{rssi}", 90, 0, st7789.WHITE, st7789.BLUE)
-
-
-# def update_bat():
-#     global bat_time_update
-#     global RSSI
-#     if time.ticks_diff(bat_time_update, time.ticks_ms()) < 0:
-#         battery_voltage=((bat.read_u16() * 3.3) / 65535)/ (100/200)
-#         #update every minute
-#         bat_time_update = time.ticks_add(time.ticks_ms(), 60000)
-#         draw_navbar(round(battery_voltage,2), RSSI)
-
-# #enable keyboard
-# kbd_pwr.on()
-# utime.sleep(.5)
-
-
-# #draw red delimiter line
-# for i in range(0,318,8):
-#     tft.text(font, "-", i, 206, st7789.BLUE, st7789.BLACK)
-
-# while True:
-
-#     update_bat()
-
-#     a = get_key()
-
-#     if a != b'\x00':
-#         print(a)
-#         # handle backspace
-#         if a == b'\x08':
-#             #delete last char including backspace byte
-#             cmd_buf=cmd_buf[:-1]
-#             tft.text(font, clean_input, 0, 222, st7789.BLACK, st7789.BLACK)
-#             tft.text(font, cmd_buf.decode(), 0 , 222, st7789.BLACK, st7789.BLACK)
-#         else:
-#             cmd_buf +=a
-
-#         if a == b'\r':
-#             print("Sending...")
-#             sound.click()
-#             chat_history(b'me> '+ cmd_buf)
-#             tft.text(font, clean_input, 0, 222, st7789.BLACK, st7789.BLACK)
-#             cmd_buf=b''
-
-#         cmd_line(cmd_buf)
-
-# kbd_pwr.off()
+#     if not sta_if.
