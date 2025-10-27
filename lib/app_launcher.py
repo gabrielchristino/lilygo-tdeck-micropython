@@ -22,9 +22,9 @@ class AppLauncher:
         self.selected_app = None
 
     def scan_apps(self):
-        """Scan /app directory for valid apps (directories with __init__.py)"""
+        """Scan /sd/app directory for valid apps (directories with __init__.py)"""
         self.apps = []
-        app_base_path = '/app'
+        app_base_path = '/sd/app'
         try:
             app_dirs = os.listdir(app_base_path)
             for dir_name in app_dirs:

@@ -7,10 +7,12 @@ trackball, som) uma única vez para evitar conflitos e uso excessivo de memória
 
 import machine
 import time
+import os
 import tft_config as tft
 from lib.touch import Touch
 from lib.trackball import Trackball
 from lib.sound import SoundManager
+from lib.sdcard import _SDCard
 
 def init_hardware():
     """
@@ -33,6 +35,16 @@ def init_hardware():
     touch = tft.config_touch(i2c)
     trackball = Trackball()
     sound = SoundManager()
+
+    # Inicializa e monta o cartão SD
+    try:
+        spi = machine.SPI(1, baudrate=1000000, sck=machine.Pin(40), mosi=machine.Pin(41), miso=machine.Pin(38))
+        cs = machine.Pin(39, machine.Pin.OUT)
+        sd = _SDCard(spi, cs)
+        os.mount(sd, '/sd')
+        print("SD card montado em /sd")
+    except Exception as e:
+        print(f"Erro ao montar SD card: {e}")
 
     print("Hardware inicializado com sucesso.")
 
