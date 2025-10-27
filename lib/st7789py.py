@@ -271,6 +271,7 @@ class ST7789:
         backlight=None,
         rotation=0,
         color_order=BGR,
+        baudrate=80_000_000,
         custom_init=None,
         custom_rotations=None,
     ):
@@ -294,6 +295,10 @@ class ST7789:
         self.xstart = 0
         self.ystart = 0
         self.spi = spi
+        # Acessa o baudrate diretamente do objeto SPI.
+        # O método init() em MicroPython retorna None, então não podemos usá-lo para obter o baudrate.
+        # Esta abordagem é mais segura e compatível.
+        self.baudrate = baudrate
         self.reset = reset
         self.dc = dc
         self.cs = cs
@@ -329,6 +334,8 @@ class ST7789:
 
     def _write(self, command=None, data=None):
         """SPI write to the device: commands and data."""
+        # Reconfigura o SPI para a velocidade do display antes de cada escrita
+        self.spi.init(baudrate=self.baudrate)
         if self.cs:
             self.cs.off()
         if command is not None:

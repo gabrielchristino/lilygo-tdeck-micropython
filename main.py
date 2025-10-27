@@ -1,42 +1,26 @@
-# /home/gabriel/Documents/tdeck/teste base/main.py
+"""Main application - App Launcher"""
 
 import time
-from romfonts import vga1_8x8 as font
-from lib.hardware_init import init_hardware
-from lib.keyboard import get_key
-from lib.ui_manager import UIManager
+import tft_config as tft
 import st7789py as st7789
+from romfonts import vga1_8x8 as font
+from lib.app_launcher import AppLauncher
+from lib.hardware_init import init_hardware
 
 # --- Inicialização ---
-display, touch, i2c, kbd_int = init_hardware()
+print("Inicializando T-Deck...")
+try:
+    # Inicializa todo o hardware uma única vez
+    display, touch, trackball, i2c, sound = init_hardware()
+except Exception as e:
+    print(f"Falha crítica na inicialização do hardware: {e}")
+    # Loop infinito em caso de falha de hardware para evitar mais erros
+    while True: time.sleep(1)
 
-# --- Configura UI Manager ---
-ui_manager = UIManager(display, touch, i2c, font)
+# --- Execução Principal ---
+print("Iniciando launcher de apps...")
+# Cria o launcher UMA ÚNICA VEZ, passando os objetos de hardware.
+launcher = AppLauncher(display, touch, trackball, i2c, sound)
 
-# Adiciona campos de entrada
-ui_manager.add_text_input(
-    x=40, y=50, w=240, h=40,
-    placeholder="Digite seu nome...",
-    bg_color=st7789.color565(66, 66, 66),
-    text_color=st7789.WHITE
-)
-
-ui_manager.add_numeric_input(
-    x=40, y=120, w=240, h=40,
-    placeholder="Digite sua idade...",
-    bg_color=st7789.color565(66, 66, 66),
-    text_color=st7789.WHITE
-)
-
-# --- Loop Principal ---
-while True:
-    # Processa eventos de toque
-    ui_manager.handle_touch()
-
-    # Processa eventos do trackball
-    ui_manager.handle_trackball()
-
-    # Processa entrada do teclado
-    ui_manager.handle_keyboard(get_key)
-
-    time.sleep_ms(20)  # Pequeno delay para não sobrecarregar a CPU
+# Inicia o loop infinito do launcher. Ele agora gerencia o retorno dos apps.
+launcher.run_launcher()

@@ -109,8 +109,6 @@ class InputBase:
             if self.value:
                 self.value = self.value[:-1]
                 return True
-        elif key == b'\r':  # Enter
-            return False
         else:
             try:
                 decoded = key.decode()

@@ -1,37 +1,39 @@
-"""Hardware initialization module for T-Deck"""
+"""
+Módulo de Inicialização Centralizada de Hardware para o T-Deck.
+
+Este script inicializa todos os componentes de hardware (display, I2C, touch,
+trackball, som) uma única vez para evitar conflitos e uso excessivo de memória.
+"""
 
 import machine
 import time
 import tft_config as tft
-import st7789py as st7789
-
-# Keyboard and I2C configuration
-KBD_INT_PIN = 46
-KBD_I2C_ADDR = 0x55
-I2C_SCL_PIN = 8
-I2C_SDA_PIN = 18
-I2C_FREQ = 400000
+from lib.touch import Touch
+from lib.trackball import Trackball
+from lib.sound import SoundManager
 
 def init_hardware():
-    """Initialize all hardware components and return configured objects"""
+    """
+    Inicializa todos os periféricos e retorna suas instâncias.
+    Esta função deve ser chamada apenas uma vez no boot.
+    """
+    print("Inicializando hardware centralizado...")
 
-    # Enable peripheral power (keyboard and touch)
+    # Habilita a alimentação dos periféricos (teclado, touch)
     machine.Pin(tft.PERIPHERAL_PIN, machine.Pin.OUT, value=1)
     time.sleep(0.2)
 
-    # Create shared I2C instance
-    i2c = machine.SoftI2C(scl=machine.Pin(I2C_SCL_PIN), sda=machine.Pin(I2C_SDA_PIN), freq=I2C_FREQ)
-
-    # Initialize display
+    # Cria a instância do display. A função config() cuidará da sua própria inicialização SPI.
     display = tft.config()
-    display.fill(st7789.color565(30, 30, 30))  # Dark gray background
 
-    # Initialize touch
+    # Cria a instância compartilhada do barramento I2C
+    i2c = machine.SoftI2C(scl=machine.Pin(8), sda=machine.Pin(18), freq=400000)
+
+    # Inicializa os periféricos que usam I2C ou outros pinos
     touch = tft.config_touch(i2c)
+    trackball = Trackball()
+    sound = SoundManager()
 
-    # Configure keyboard interrupt pin (not used in current implementation)
-    kbd_int = machine.Pin(KBD_INT_PIN, machine.Pin.IN)
+    print("Hardware inicializado com sucesso.")
 
-    print("Display, Touch e Teclado inicializados.")
-
-    return display, touch, i2c, kbd_int
+    return display, touch, trackball, i2c, sound

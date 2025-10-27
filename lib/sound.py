@@ -40,34 +40,51 @@ class SoundManager:
 
         return samples
 
-    def play_click(self):
-        """Play a short click sound"""
-        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, self.TONE_FREQUENCY_IN_HZ)
+    def play_touch_select(self):
+        """Play sound for touch field selection - low, pleasant tone"""
+        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, 330)  # Lower tone (E4)
         tone = bytearray()
 
-        for i in range(50):  # Shorter click sound
-            tone = tone + click
-
-        self.i2s.write(tone)
-
-    def play_keypress(self):
-        """Play sound for key press"""
-        # Slightly different tone for key presses
-        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, self.TONE_FREQUENCY_IN_HZ + 100)
-        tone = bytearray()
-
-        for i in range(30):  # Even shorter for key presses
+        for i in range(60):  # Medium length
             tone = tone + click
 
         self.i2s.write(tone)
 
     def play_navigation(self):
-        """Play sound for navigation (trackball movement)"""
-        # Higher pitched, shorter sound for navigation
-        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, self.TONE_FREQUENCY_IN_HZ + 200)
+        """Play sound for navigation (trackball movement) - quick, high-pitched beep"""
+        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, 880)  # High tone (A5)
         tone = bytearray()
 
-        for i in range(20):  # Very short navigation sound
+        for i in range(15):  # Very short
             tone = tone + click
 
         self.i2s.write(tone)
+
+    def play_keypress(self):
+        """Play sound for key press - crisp, short click"""
+        click = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, 660)  # Medium-high (E5)
+        tone = bytearray()
+
+        for i in range(25):  # Short
+            tone = tone + click
+
+        self.i2s.write(tone)
+
+    def play_confirm(self):
+        """Play sound for confirmation (Enter/trackball click) - satisfying, two-tone"""
+        # First tone
+        click1 = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, 523)  # C5
+        tone = bytearray()
+        for i in range(40):
+            tone = tone + click1
+
+        # Second tone (higher)
+        click2 = self.make_tone(self.SAMPLE_RATE_IN_HZ, self.SAMPLE_SIZE_IN_BITS, 659)  # E5
+        for i in range(40):
+            tone = tone + click2
+
+        self.i2s.write(tone)
+
+    def play_click(self):
+        """Legacy method - now uses play_confirm for backward compatibility"""
+        self.play_confirm()

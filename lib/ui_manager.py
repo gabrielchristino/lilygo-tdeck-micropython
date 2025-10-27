@@ -3,18 +3,18 @@
 from lib.material_components import TextInput, NumericInput
 from lib.touch import Touch
 from lib.trackball import Trackball
-from lib.sound import SoundManager
+from lib.sound import SoundManager # Mantido para referência, mas a instância é injetada
 
 class UIManager:
-    def __init__(self, display, touch, i2c, font):
+    def __init__(self, display, touch, i2c, font, trackball, sound):
         self.display = display
         self.touch = touch
         self.i2c = i2c
         self.font = font
         self.inputs = []
         self.focused_input = None
-        self.trackball = Trackball()
-        self.sound = SoundManager()
+        self.trackball = trackball # Usa a instância injetada
+        self.sound = sound         # Usa a instância injetada
 
     def add_text_input(self, x, y, w, h, placeholder, bg_color, text_color):
         """Add a text input field"""
@@ -51,16 +51,18 @@ class UIManager:
                     new_focus = inp
                     break
 
-            # Manage focus change and redraw fields
+            # Manage focus change and redraw fields only if focus actually changed
             if new_focus != self.focused_input:
+                # Clear previous focus
                 if self.focused_input:
                     self.focused_input.focused = False
                     self.focused_input.draw(self.display)  # Redraw without focus border
 
+                # Set new focus
                 if new_focus:
                     new_focus.focused = True
                     new_focus.draw(self.display)  # Redraw with focus border
-                    self.sound.play_click()  # Play sound when field is selected
+                    self.sound.play_touch_select()  # Play sound when field is selected by touch
 
                 self.focused_input = new_focus
 
@@ -88,7 +90,7 @@ class UIManager:
                 new_index = min(len(self.inputs) - 1, current_index + 1)
 
             if new_index != current_index:
-                # Change focus
+                # Change focus - only redraw if actually changing
                 if self.focused_input:
                     self.focused_input.focused = False
                     self.focused_input.draw(self.display)
@@ -102,17 +104,21 @@ class UIManager:
                     self.focused_input = None
 
         if click and self.focused_input:
-            # Simulate enter key press for focused field
-            if self.focused_input.handle_key(b'\r'):
-                self.focused_input.draw_text(self.display)
-                print(f"Valor final do campo '{self.focused_input.placeholder}': {self.focused_input.value}")
-                self.sound.play_click()  # Play sound when confirming with trackball click
+            # Um clique do trackball em um campo focado é uma confirmação.
+            # Toca o som de confirmação e retorna True para sinalizar ao app para sair.
+            print(f"Valor final do campo '{self.focused_input.placeholder}': {self.focused_input.value}")
+            self.sound.play_confirm()
+            return True # Indica que um clique de confirmação foi processado
+
+        return False # Nenhum clique de confirmação processado
 
     def handle_keyboard(self, get_key_func):
         """Process keyboard input for focused field"""
         if self.focused_input:
             key = get_key_func(self.i2c)
             if key:
+                # Debug print to check if keys are being read
+                print(f"Tecla recebida: {key}")
                 # handle_key returns True if text was changed
                 if self.focused_input.handle_key(key):
                     # Redraw only the text part for faster updates
@@ -121,4 +127,4 @@ class UIManager:
                     self.sound.play_keypress()  # Play sound when typing
                 elif key == b'\r':  # Enter key
                     print(f"Valor final do campo '{self.focused_input.placeholder}': {self.focused_input.value}")
-                    self.sound.play_click()  # Play sound when pressing Enter
+                    self.sound.play_confirm()  # Play sound when pressing Enter

@@ -2,6 +2,12 @@ import machine
 import st7789py as st7789
 from touch import Touch
 
+# Define const para otimização do MicroPython
+try:
+    from micropython import const
+except ImportError:
+    const = lambda x: x
+    
 _DISPLAY_HEIGHT = const(240)
 _DISPLAY_WIDTH = const(320)
 _DISPLAY_SPI_ID = const(1)
@@ -17,12 +23,10 @@ _DISPLAY_ROTATION = const(1)
 PERIPHERAL_PIN = const(10)
 
 # --- Touch constants ---
-_TOUCH_I2C_SDA = const(18)
-_TOUCH_I2C_SCL = const(8)
 _TOUCH_I2C_INT = const(16)
-_TOUCH_I2C_FREQ = const(400000)
 
 def config():
+    """Configura e retorna o objeto do display, criando seu próprio objeto SPI."""
     machine.Pin(PERIPHERAL_PIN, machine.Pin.OUT, value=1)
     return st7789.ST7789(machine.SPI(
                 _DISPLAY_SPI_ID,
@@ -37,7 +41,8 @@ def config():
                 dc=machine.Pin(_DISPLAY_DC, machine.Pin.OUT),
                 cs=machine.Pin(_DISPLAY_CS, machine.Pin.OUT),
                 backlight=machine.Pin(_DISPLAY_BACKLIGHT, machine.Pin.OUT),
-                rotation=_DISPLAY_ROTATION)
+                rotation=_DISPLAY_ROTATION,
+                baudrate=_DISPLAY_BAUDRATE)
 
 def config_touch(i2c):
     """Inicializa e retorna o driver de touch GT911."""
