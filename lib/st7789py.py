@@ -1141,6 +1141,119 @@ class ST7789:
                 d = d + 4 * x + 6
             draw_lines(x, y)
 
+    def draw_bmp(self, filename, x, y):
+        """
+        Draw a BMP file at the specified position.
+
+        Supports 16-bit BMP with A1 R5 G5 B5 format (1 alpha, 5 red, 5 green, 5 blue).
+        Only opaque pixels (alpha=1) are drawn.
+
+        Args:
+            filename (str): Path to the BMP file.
+            x (int): X-coordinate to draw at.
+            y (int): Y-coordinate to draw at.
+        """
+        try:
+            with open(filename, 'rb') as f:
+                # Read BMP header
+                header = f.read(54)
+                if len(header) < 54:
+                    return  # Invalid BMP
+
+                # Check bits per pixel (should be 16)
+                bpp = int.from_bytes(header[28:30], 'little')
+                if bpp != 16:
+                    return
+
+                # Get width and height (little-endian)
+                width = int.from_bytes(header[18:22], 'little')
+                height = int.from_bytes(header[22:26], 'little')
+
+                # Check if within display bounds
+                if x + width > self.width or y + height > self.height or x < 0 or y < 0:
+                    return
+
+                # Read pixel data
+                pixels = f.read(width * height * 2)  # 2 bytes per pixel
+                if len(pixels) != width * height * 2:
+                    return  # Invalid data
+
+                # BMP is bottom-up, so start from last row
+                for row in range(height):
+                    bmp_row = height - 1 - row
+                    for col in range(width):
+                        pixel_start = (bmp_row * width + col) * 2
+                        pixel = int.from_bytes(pixels[pixel_start:pixel_start+2], 'little')
+
+                        # Extract A1 R5 G5 B5
+                        alpha = (pixel >> 15) & 0x1
+                        if alpha == 1:
+                            red = (pixel >> 10) & 0x1F
+                            green = (pixel >> 5) & 0x1F
+                            blue = pixel & 0x1F
+
+                            # Convert to RGB565: RRRRR GGGGGG BBBBB
+                            # O formato A1R5G5B5 tem 5 bits para verde. RGB565 tem 6.
+                            # Para converter, pegamos os 5 bits de verde e os colocamos
+                            # nos 5 bits mais significativos do campo verde de 6 bits.
+                            # (green << 1) faz isso.
+                            rgb565 = (red << 11) | (green << 6) | blue
+                            self.pixel(x + col, y + row, rgb565)
+
+        except Exception as e:
+            # Silently fail if file not found or invalid
+            pass
+
+    def draw_p4(self, filename, x, y):
+        """
+        Draw a P4 file (4-bit indexed color with palette) at the specified position.
+        The P4 file must contain width and height as the first two bytes.
+
+        Args:
+            filename (str): Path to the P4 file.
+            x (int): X-coordinate to draw at.
+            y (int): Y-coordinate to draw at.
+        """
+        try:
+            with open(filename, 'rb') as f:
+                # Lê a largura e altura dos dois primeiros bytes
+                dims = f.read(2)
+                if len(dims) != 2: return # Arquivo inválido
+                width, height = dims[0], dims[1]
+
+                # Lê a paleta (16 cores * 2 bytes/cor = 32 bytes)
+                palette_data = f.read(32)
+                if len(palette_data) != 32:
+                    return # Arquivo inválido
+
+                # Carrega a paleta
+                palette = [struct.unpack('>H', palette_data[i:i+2])[0] for i in range(0, 32, 2)]
+
+                # Buffer para uma linha de pixels (em RGB565)
+                row_buffer = bytearray(width * 2)
+
+                # Lê e desenha linha por linha
+                for r in range(height):
+                    # Cada linha tem (width / 2) bytes de dados de índice
+                    row_indices_data = f.read(width // 2)
+                    if len(row_indices_data) != width // 2:
+                        break # Fim do arquivo ou dados corrompidos
+
+                    # Desempacota os índices e cria a linha de pixels RGB565
+                    for i in range(width // 2):
+                        packed_byte = row_indices_data[i]
+                        idx1 = packed_byte >> 4
+                        idx2 = packed_byte & 0x0F
+
+                        # Converte índice para cor e coloca no buffer (Big Endian)
+                        struct.pack_into('>H', row_buffer, i * 4, palette[idx1])
+                        struct.pack_into('>H', row_buffer, i * 4 + 2, palette[idx2])
+
+                    # Desenha a linha na tela
+                    self.blit_buffer(row_buffer, x, y + r, width, 1)
+        except Exception as e:
+            print(f"Erro ao desenhar P4 {filename}: {e}")
+
     @micropython.native
     def polygon(self, points, x, y, color, angle=0, center_x=0, center_y=0):
         """

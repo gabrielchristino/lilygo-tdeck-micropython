@@ -1,4 +1,4 @@
-"""App Launcher Module - Lists and launches apps from /app directory"""
+"""App Launcher Module - Lists and launches apps from /sd/app directory"""
 
 import os
 import gc  # Importar o Garbage Collector
@@ -31,14 +31,68 @@ class AppLauncher:
             for dir_name in app_dirs:
                 app_full_path = f"{app_base_path}/{dir_name}"
                 # Verifica se é um diretório e tem __init__.py
-                if '__init__.py' in os.listdir(app_full_path):
+                dir_contents = os.listdir(app_full_path)
+                if '__init__.py' in dir_contents:
+                    icon_path = None
+                    if '__icon__.p4' in dir_contents:
+                        icon_path = f'{app_full_path}/__icon__.p4'
+                    elif '__icon__.bmp' in dir_contents:
+                        icon_path = f'{app_full_path}/__icon__.bmp'
+
                     self.apps.append({
                         'name': dir_name,
                         'path': app_full_path,
-                        'init_file': f'{app_full_path}/__init__.py'
+                        'init_file': f'{app_full_path}/__init__.py',
+                        'icon_path': icon_path
                     })
-        except Exception as e:
-            print(f"Erro ao escanear diretório de apps: {e}")
+        except OSError as e:
+            # Se o diretório /sd/app não existir (ENOENT), não é um erro fatal.
+            # Apenas significa que não há apps para listar.
+            if e.args[0] == 2: # errno 2 is ENOENT
+                print("Diretório de apps '/sd/app' não encontrado. Verifique o SD card.")
+            else:
+                print(f"Erro de I/O ao escanear diretório de apps: {e}")
+
+    def draw_app_item(self, index):
+        """Draw a single app item at a given index."""
+        if not (0 <= index < len(self.apps)):
+            return
+
+        app = self.apps[index]
+        is_selected = (app == self.selected_app)
+
+        # List settings
+        item_height = 40
+        start_y = 40
+        icon_size = 30
+        
+        y = index * item_height + start_y
+        x = 10
+
+        color = st7789.BLUE if is_selected else st7789.WHITE
+        bg_color = st7789.color565(40, 40, 40) if is_selected else st7789.color565(20, 20, 20)
+
+        # Draw item background
+        self.display.fill_rect(x - 5, y - 2, 220, item_height - 4, bg_color)
+
+        # Draw selection border
+        if is_selected:
+            self.display.rect(x - 5, y - 2, 220, item_height - 4, st7789.BLUE)
+
+        # Draw icon
+        if app['icon_path']:
+            icon_y = y + (item_height - icon_size - 4) // 2
+            if app['icon_path'].endswith('.p4'):
+                self.display.draw_p4(app['icon_path'], x, icon_y)
+            elif app['icon_path'].endswith('.bmp'):
+                try:
+                    self.display.draw_bmp(app['icon_path'], x, icon_y)
+                except Exception as e:
+                    print(f"Erro ao desenhar icone {app['icon_path']}: {e}")
+                    self.display.fill_rect(x, icon_y, icon_size, icon_size, st7789.RED)
+        
+        # Draw app name (sem fundo para não cortar o ícone)
+        self.display.text(font, app['name'][:15], x + icon_size + 10, y + 10, color, bg_color)
 
     def draw_app_list(self):
         """Draw the vertical list of available apps"""
@@ -53,30 +107,9 @@ class AppLauncher:
             self.display.text(font, "com __init__.py", 10, 90, st7789.GRAY, st7789.color565(20, 20, 20))
             return
 
-        # List settings
-        item_height = 40
-        start_y = 40
-        icon_size = 30
-
         # Draw app list
         for i, app in enumerate(self.apps):
-            y = i * item_height + start_y
-            x = 10
-
-            color = st7789.BLUE if app == self.selected_app else st7789.WHITE
-            bg_color = st7789.color565(40, 40, 40) if app == self.selected_app else st7789.color565(20, 20, 20)
-
-            # Draw selection rectangle
-            if app == self.selected_app:
-                self.display.fill_rect(x-2, y-2, 220, item_height-4, st7789.color565(40, 40, 40))
-                self.display.rect(x-2, y-2, 220, item_height-4, st7789.BLUE)
-
-            # Placeholder for no icon
-            self.display.fill_rect(x, y, icon_size, icon_size, st7789.color565(50, 50, 50))
-
-            # Draw app name next to icon
-            self.display.text(font, app['name'][:15], x + icon_size + 10, y + 10, color, bg_color)
-
+            self.draw_app_item(i)
 
     def select_app(self, index):
         """Select an app by index"""
@@ -114,6 +147,7 @@ class AppLauncher:
         self.scan_apps()
         self.reset_icon_cache()  # Reset cache on start
         selected_index = 0
+        last_selected_index = -1
         self.select_app(selected_index)
         self.draw_app_list()  # Draw initial list
 
@@ -129,17 +163,19 @@ class AppLauncher:
                     tapped_index = (y - 40) // item_height
                     if 0 <= tapped_index < len(self.apps):
                         if tapped_index != selected_index:
+                            last_selected_index = selected_index
                             selected_index = tapped_index
                             self.select_app(selected_index)
                             self.sound.play_navigation()
                             redraw_needed = True
                         else: # Tapped on the already selected app
                             time.sleep_ms(200)  # Debounce
+                            last_selected_index = selected_index
                             if self.launch_selected_app():
                                 # App finished, reset state and redraw
-                                selected_index = 0
-                                self.select_app(selected_index)
-                                redraw_needed = True
+                                self.scan_apps() # Re-scan apps in case something changed
+                                self.select_app(selected_index) # Re-select to refresh state
+                                self.draw_app_list() # Full redraw after app closes
 
             # Handle trackball input
             direction, click = self.trackball.get_direction()
@@ -156,20 +192,25 @@ class AppLauncher:
                     # No left/right in list, maybe wrap or ignore
                     pass
                 if selected_index != old_index:
+                    last_selected_index = old_index # Guarda o índice antigo para redesenhar
                     self.select_app(selected_index)
                     self.sound.play_navigation()
                     redraw_needed = True
 
             if click and self.selected_app:
+                last_selected_index = selected_index
                 # Launch the app, and if it runs successfully...
                 if self.launch_selected_app():
                     # ...reset the selection and redraw the launcher screen.
-                    selected_index = 0
                     self.select_app(selected_index)
-                    redraw_needed = True
+                    self.draw_app_list() # Redesenho completo após sair do app
 
             # Only redraw if something changed
             if redraw_needed:
-                self.draw_app_list()
+                # Redesenha o item antigo para remover a seleção
+                if last_selected_index != -1:
+                    self.draw_app_item(last_selected_index)
+                # Redesenha o novo item selecionado
+                self.draw_app_item(selected_index)
 
             time.sleep_ms(50)
