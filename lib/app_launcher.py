@@ -1,6 +1,6 @@
 """App Launcher Module - Lists and launches apps from /sd/app directory"""
 
-import os
+import os as _os # Importa 'os' com um alias para evitar conflitos
 import gc  # Importar o Garbage Collector
 import time
 import tft_config as tft
@@ -27,11 +27,11 @@ class AppLauncher:
         self.apps = []
         app_base_path = '/sd/app'
         try:
-            app_dirs = os.listdir(app_base_path)
+            app_dirs = _os.listdir(app_base_path)
             for dir_name in app_dirs:
                 app_full_path = f"{app_base_path}/{dir_name}"
                 # Verifica se é um diretório e tem __init__.py
-                dir_contents = os.listdir(app_full_path)
+                dir_contents = _os.listdir(app_full_path)
                 if '__init__.py' in dir_contents:
                     icon_path = None
                     if '__icon__.p4' in dir_contents:

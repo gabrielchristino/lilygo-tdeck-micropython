@@ -4,6 +4,7 @@ import time
 import tft_config as tft
 import st7789py as st7789
 from romfonts import vga1_8x8 as font
+from lib import updater
 from lib.app_launcher import AppLauncher
 from lib.hardware_init import init_hardware
 
@@ -16,6 +17,14 @@ except Exception as e:
     print(f"Falha crítica na inicialização do hardware: {e}")
     # Loop infinito em caso de falha de hardware para evitar mais erros
     while True: time.sleep(1)
+
+# --- Verificação de Atualização ---
+# Verifica se há um arquivo update.zip e executa o processo de atualização.
+if updater.run_update_process(display):
+    # Se uma atualização foi realizada, o dispositivo será reiniciado.
+    time.sleep(3)
+    import machine
+    machine.reset()
 
 # --- Execução Principal ---
 print("Iniciando launcher de apps...")

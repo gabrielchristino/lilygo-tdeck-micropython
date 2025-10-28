@@ -1,5 +1,6 @@
 """UI Manager for handling input field interactions"""
 
+import os as _os # Importa 'os' com um alias para evitar conflitos
 from lib.material_components import TextInput, NumericInput
 from lib.touch import Touch
 from lib.trackball import Trackball

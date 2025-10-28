@@ -7,7 +7,7 @@ trackball, som) uma única vez para evitar conflitos e uso excessivo de memória
 
 import machine
 import time
-import os
+import os as _os # Importa 'os' com um alias para evitar conflitos
 import tft_config as tft
 from lib.touch import Touch
 from lib.trackball import Trackball
@@ -73,7 +73,7 @@ def init_hardware():
         cs = machine.Pin(39, machine.Pin.OUT)
         # Reutiliza o barramento SPI compartilhado
         sd = _SDCard(shared_spi, cs)
-        os.mount(sd, '/sd')
+        _os.mount(sd, '/sd')
         print("SD card montado em /sd")
     except Exception as e:
         print(f"Erro ao montar SD card: {e}")

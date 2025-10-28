@@ -63,6 +63,8 @@ except ImportError:
     sleep_ms = lambda ms: None
     uint = int
     const = lambda x: x
+    ptr16 = lambda x: x # Dummy for non-micropython
+    ptr8 = lambda x: x # Dummy for non-micropython
 
     class micropython:
         @staticmethod
@@ -78,6 +80,13 @@ except ImportError:
 # If you don't need to build the docs, you can remove all of the lines between
 # here and the comment above except for the "from time import sleep_ms" line.
 #
+
+# Explicitly import ptr16 and ptr8 for MicroPython viper functions
+try:
+    from micropython import ptr16, ptr8
+except ImportError:
+    # Fallback if not running on MicroPython or older version
+    pass # Already defined dummies above if sleep_ms failed
 
 import struct
 
@@ -334,7 +343,8 @@ class ST7789:
 
     def _write(self, command=None, data=None):
         """SPI write to the device: commands and data."""
-        # Reconfigura o SPI para a velocidade do display antes de cada escrita
+        # Força a re-inicialização do barramento SPI para a velocidade correta.
+        # Isso evita conflitos com outros dispositivos no mesmo barramento.
         self.spi.init(baudrate=self.baudrate)
         if self.cs:
             self.cs.off()
