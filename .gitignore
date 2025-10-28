@@ -1,0 +1,4 @@
+# Ignorar arquivos gerados pelo dispositivo ou que contêm segredos
+
+# Arquivo de senhas de Wi-Fi salvas
+**/known_networks.txt

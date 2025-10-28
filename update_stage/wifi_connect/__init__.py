@@ -168,21 +168,34 @@ class App:
             for i, ssid in enumerate(ssids):
                 y = 40 + i * 20
                 color = HIGHLIGHT_COLOR if i == selected_index else TEXT_COLOR
-                self.display.text(font, f"> {ssid[:25]}", 10, y, color, BG_COLOR)
+                # Limita a exibição para não sobrepor o botão Sair
+                if y < 210:
+                    self.display.text(font, f"> {ssid[:25]}", 10, y, color, BG_COLOR)
+
+            # Desenha o botão Sair
+            is_exit_focused = (selected_index == len(ssids))
+            exit_color = HIGHLIGHT_COLOR if is_exit_focused else TEXT_COLOR
+            self.display.text(font, "[ Sair ]", 10, 225, exit_color, BG_COLOR)
 
             while True:
                 direction, click = self.trackball.get_direction()
                 key = self.get_key_simple()
                 if direction:
                     old_index = selected_index
-                    if direction == 'up': selected_index = max(0, selected_index - 1)
-                    elif direction == 'down': selected_index = min(len(ssids) - 1, selected_index + 1)
+                    if direction == 'up':
+                        selected_index = (selected_index - 1) % (len(ssids) + 1)
+                    elif direction == 'down':
+                        selected_index = (selected_index + 1) % (len(ssids) + 1)
+
                     if selected_index != old_index:
                         self.sound.play_navigation()
                         break
                 if click or (key and key == b'\r'):
-                    self.sound.play_confirm()
-                    return ssids[selected_index]
+                    if selected_index == len(ssids): # Botão Sair selecionado
+                        return None # Retorna None para indicar saída
+                    else:
+                        self.sound.play_confirm()
+                        return ssids[selected_index]
                 time.sleep_ms(50)
 
 # --- Ponto de Entrada do App ---
