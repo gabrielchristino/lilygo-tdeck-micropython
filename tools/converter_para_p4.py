@@ -4,7 +4,7 @@ import struct
 from PIL import Image
 
 # Coloque o caminho para a pasta de aplicativos do seu T-Deck
-APP_BASE_PATH = '/home/gabriel/Documents/tdeck/teste base/app' # Caminho no seu PC
+APP_BASE_PATH = '/home/gabriel/Documents/tdeck/teste base/update_stage' # Caminho no seu PC
 
 def convert_to_p4(bmp_path, p4_path):
     """Converte uma imagem para o formato P4 (4-bit com paleta RGB565)."""
