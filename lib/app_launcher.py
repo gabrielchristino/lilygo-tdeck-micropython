@@ -41,7 +41,7 @@ class AppLauncher:
             print(f"Erro ao escanear diretório de apps: {e}")
 
     def draw_app_list(self):
-        """Draw the grid of available apps"""
+        """Draw the vertical list of available apps"""
         self.display.fill(st7789.color565(20, 20, 20))  # Dark background
 
         # Title
@@ -53,32 +53,29 @@ class AppLauncher:
             self.display.text(font, "com __init__.py", 10, 90, st7789.GRAY, st7789.color565(20, 20, 20))
             return
 
-        # Grid settings
-        cols = 3
-        cell_width = 100
-        cell_height = 120
+        # List settings
+        item_height = 40
         start_y = 40
+        icon_size = 30
 
-        # Draw app grid
+        # Draw app list
         for i, app in enumerate(self.apps):
-            row = i // cols
-            col = i % cols
-            x = col * cell_width + 10
-            y = row * cell_height + start_y
+            y = i * item_height + start_y
+            x = 10
 
             color = st7789.BLUE if app == self.selected_app else st7789.WHITE
             bg_color = st7789.color565(40, 40, 40) if app == self.selected_app else st7789.color565(20, 20, 20)
 
             # Draw selection rectangle
             if app == self.selected_app:
-                self.display.fill_rect(x-2, y-2, cell_width-6, cell_height-10, st7789.color565(40, 40, 40))
-                self.display.rect(x-2, y-2, cell_width-6, cell_height-10, st7789.BLUE)
+                self.display.fill_rect(x-2, y-2, 220, item_height-4, st7789.color565(40, 40, 40))
+                self.display.rect(x-2, y-2, 220, item_height-4, st7789.BLUE)
 
             # Placeholder for no icon
-            self.display.fill_rect(x, y, 80, 80, st7789.color565(50, 50, 50))
+            self.display.fill_rect(x, y, icon_size, icon_size, st7789.color565(50, 50, 50))
 
-            # Draw app name below icon
-            self.display.text(font, app['name'][:10], x, y + 85, color, bg_color)  # Nome truncado para caber
+            # Draw app name next to icon
+            self.display.text(font, app['name'][:15], x + icon_size + 10, y + 10, color, bg_color)
 
 
     def select_app(self, index):
@@ -126,12 +123,10 @@ class AppLauncher:
             # Handle touch input
             event_type, x, y = self.touch.read()
             if event_type == Touch.TAP:
-                # Calculate which app was tapped in grid
+                # Calculate which app was tapped in list
                 if y >= 40:
-                    row = (y - 40) // 120
-                    col = (x - 10) // 100
-                    cols = 3
-                    tapped_index = row * cols + col
+                    item_height = 40
+                    tapped_index = (y - 40) // item_height
                     if 0 <= tapped_index < len(self.apps):
                         if tapped_index != selected_index:
                             selected_index = tapped_index
@@ -150,21 +145,16 @@ class AppLauncher:
             direction, click = self.trackball.get_direction()
             if direction:
                 old_index = selected_index
-                cols = 3
-                rows = (len(self.apps) + cols - 1) // cols
-                current_row = selected_index // cols
-                current_col = selected_index % cols
                 if direction == 'up':
-                    current_row = max(0, current_row - 1)
+                    selected_index = max(0, selected_index - 1)
                 elif direction == 'down':
-                    current_row = min(rows - 1, current_row + 1)
+                    selected_index = min(len(self.apps) - 1, selected_index + 1)
                 elif direction == 'left':
-                    current_col = max(0, current_col - 1)
+                    # No left/right in list, maybe wrap or ignore
+                    pass
                 elif direction == 'right':
-                    current_col = min(cols - 1, current_col + 1)
-                selected_index = current_row * cols + current_col
-                if selected_index >= len(self.apps):
-                    selected_index = len(self.apps) - 1
+                    # No left/right in list, maybe wrap or ignore
+                    pass
                 if selected_index != old_index:
                     self.select_app(selected_index)
                     self.sound.play_navigation()
