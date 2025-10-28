@@ -10,39 +10,25 @@ except ImportError:
     
 _DISPLAY_HEIGHT = const(240)
 _DISPLAY_WIDTH = const(320)
-_DISPLAY_SPI_ID = const(1)
-_DISPLAY_BAUDRATE = const(80_000_000)
-_DISPLAY_SCK = const(40)
-_DISPLAY_MOSI = const(41)
-_DISPLAY_MISO = const(38)
 _DISPLAY_RESET = const(None)
-_DISPLAY_CS = const(12)
-_DISPLAY_DC = const(11)
-_DISPLAY_BACKLIGHT = const(42)
 _DISPLAY_ROTATION = const(1)
 PERIPHERAL_PIN = const(10)
 
 # --- Touch constants ---
 _TOUCH_I2C_INT = const(16)
 
-def config():
-    """Configura e retorna o objeto do display, criando seu próprio objeto SPI."""
+def config(spi, dc_pin, cs_pin, bl_pin):
+    """Configura e retorna o objeto do display, usando um objeto SPI existente."""
     machine.Pin(PERIPHERAL_PIN, machine.Pin.OUT, value=1)
-    return st7789.ST7789(machine.SPI(
-                _DISPLAY_SPI_ID,
-                baudrate=_DISPLAY_BAUDRATE,
-                sck=machine.Pin(_DISPLAY_SCK),
-                mosi=machine.Pin(_DISPLAY_MOSI),
-                miso=machine.Pin(_DISPLAY_MISO),
-                ),
+    return st7789.ST7789(spi,
                 _DISPLAY_HEIGHT,
                 _DISPLAY_WIDTH,
                 reset=_DISPLAY_RESET,
-                dc=machine.Pin(_DISPLAY_DC, machine.Pin.OUT),
-                cs=machine.Pin(_DISPLAY_CS, machine.Pin.OUT),
-                backlight=machine.Pin(_DISPLAY_BACKLIGHT, machine.Pin.OUT),
+                dc=machine.Pin(dc_pin, machine.Pin.OUT),
+                cs=machine.Pin(cs_pin, machine.Pin.OUT),
+                backlight=machine.Pin(bl_pin, machine.Pin.OUT),
                 rotation=_DISPLAY_ROTATION,
-                baudrate=_DISPLAY_BAUDRATE)
+                baudrate=spi.baudrate if hasattr(spi, 'baudrate') else 80_000_000)
 
 def config_touch(i2c):
     """Inicializa e retorna o driver de touch GT911."""

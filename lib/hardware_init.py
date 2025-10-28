@@ -14,6 +14,25 @@ from lib.trackball import Trackball
 from lib.sound import SoundManager
 from lib.sdcard import _SDCard
 
+# Define const para otimização do MicroPython
+try:
+    from micropython import const
+except ImportError:
+    const = lambda x: x
+
+# --- Constantes de Hardware Centralizadas ---
+_DISPLAY_SPI_ID = const(1)
+_DISPLAY_BAUDRATE = const(80_000_000)
+_DISPLAY_SCK = const(40)
+_DISPLAY_MOSI = const(41)
+_DISPLAY_MISO = const(38)
+_DISPLAY_CS = const(12)
+_DISPLAY_DC = const(11)
+_DISPLAY_BACKLIGHT = const(42)
+_DISPLAY_RESET = const(None)
+_DISPLAY_ROTATION = const(1)
+
+
 def init_hardware():
     """
     Inicializa todos os periféricos e retorna suas instâncias.
@@ -25,8 +44,21 @@ def init_hardware():
     machine.Pin(tft.PERIPHERAL_PIN, machine.Pin.OUT, value=1)
     time.sleep(0.2)
 
-    # Cria a instância do display. A função config() cuidará da sua própria inicialização SPI.
-    display = tft.config()
+    # --- Criação do Barramento SPI Compartilhado ---
+    # O barramento é criado uma única vez e compartilhado entre o display e o SD card.
+    shared_spi = machine.SPI(_DISPLAY_SPI_ID,
+                             baudrate=_DISPLAY_BAUDRATE,
+                             sck=machine.Pin(_DISPLAY_SCK),
+                             mosi=machine.Pin(_DISPLAY_MOSI),
+                             miso=machine.Pin(_DISPLAY_MISO))
+
+    # Cria a instância do display, passando o barramento SPI compartilhado
+    display = tft.config(
+        spi=shared_spi,
+        dc_pin=_DISPLAY_DC,
+        cs_pin=_DISPLAY_CS,
+        bl_pin=_DISPLAY_BACKLIGHT
+    )
 
     # Cria a instância compartilhada do barramento I2C
     i2c = machine.SoftI2C(scl=machine.Pin(8), sda=machine.Pin(18), freq=400000)
@@ -38,9 +70,9 @@ def init_hardware():
 
     # Inicializa e monta o cartão SD
     try:
-        spi = machine.SPI(1, baudrate=1000000, sck=machine.Pin(40), mosi=machine.Pin(41), miso=machine.Pin(38))
         cs = machine.Pin(39, machine.Pin.OUT)
-        sd = _SDCard(spi, cs)
+        # Reutiliza o barramento SPI compartilhado
+        sd = _SDCard(shared_spi, cs)
         os.mount(sd, '/sd')
         print("SD card montado em /sd")
     except Exception as e:

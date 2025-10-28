@@ -11,6 +11,7 @@ from lib.touch import Touch
 from lib.trackball import Trackball
 from lib.sound import SoundManager
 
+
 class AppLauncher:
     def __init__(self, display, touch, trackball, i2c, sound):
         self.display = display
@@ -40,7 +41,7 @@ class AppLauncher:
             print(f"Erro ao escanear diretório de apps: {e}")
 
     def draw_app_list(self):
-        """Draw the list of available apps"""
+        """Draw the grid of available apps"""
         self.display.fill(st7789.color565(20, 20, 20))  # Dark background
 
         # Title
@@ -48,27 +49,37 @@ class AppLauncher:
 
         if not self.apps:
             self.display.text(font, "Nenhuma app encontrada", 10, 50, st7789.GRAY, st7789.color565(20, 20, 20))
-            self.display.text(font, "Crie diretorios em /app", 10, 70, st7789.GRAY, st7789.color565(20, 20, 20))
+            self.display.text(font, "Crie diretorios em /sd/app", 10, 70, st7789.GRAY, st7789.color565(20, 20, 20))
             self.display.text(font, "com __init__.py", 10, 90, st7789.GRAY, st7789.color565(20, 20, 20))
             return
 
-        # Draw app list
-        y_pos = 40
+        # Grid settings
+        cols = 3
+        cell_width = 100
+        cell_height = 120
+        start_y = 40
+
+        # Draw app grid
         for i, app in enumerate(self.apps):
+            row = i // cols
+            col = i % cols
+            x = col * cell_width + 10
+            y = row * cell_height + start_y
+
             color = st7789.BLUE if app == self.selected_app else st7789.WHITE
             bg_color = st7789.color565(40, 40, 40) if app == self.selected_app else st7789.color565(20, 20, 20)
 
             # Draw selection rectangle
             if app == self.selected_app:
-                self.display.fill_rect(5, y_pos-2, 310, 20, st7789.color565(40, 40, 40))
-                self.display.rect(5, y_pos-2, 310, 20, st7789.BLUE)
+                self.display.fill_rect(x-2, y-2, cell_width-6, cell_height-10, st7789.color565(40, 40, 40))
+                self.display.rect(x-2, y-2, cell_width-6, cell_height-10, st7789.BLUE)
 
-            self.display.text(font, f"{i+1}. {app['name']}", 10, y_pos, color, bg_color)
-            y_pos += 25
+            # Placeholder for no icon
+            self.display.fill_rect(x, y, 80, 80, st7789.color565(50, 50, 50))
 
-        # Instructions
-        self.display.text(font, "Toque ou trackball + click", 10, 200, st7789.GRAY, st7789.color565(20, 20, 20))
-        self.display.text(font, "para selecionar", 10, 220, st7789.GRAY, st7789.color565(20, 20, 20))
+            # Draw app name below icon
+            self.display.text(font, app['name'][:10], x, y + 85, color, bg_color)  # Nome truncado para caber
+
 
     def select_app(self, index):
         """Select an app by index"""
@@ -77,6 +88,12 @@ class AppLauncher:
             # Don't play sound here, play it in the caller when actually needed
             return True
         return False
+
+    def reset_icon_cache(self):
+        """Reset icon loaded cache for all apps"""
+        for app in self.apps:
+            if 'icon_loaded' in app:
+                del app['icon_loaded']
 
     def launch_selected_app(self):
         """Launch the selected app"""
@@ -98,6 +115,7 @@ class AppLauncher:
     def run_launcher(self):
         """Main launcher loop"""
         self.scan_apps()
+        self.reset_icon_cache()  # Reset cache on start
         selected_index = 0
         self.select_app(selected_index)
         self.draw_app_list()  # Draw initial list
@@ -108,10 +126,13 @@ class AppLauncher:
             # Handle touch input
             event_type, x, y = self.touch.read()
             if event_type == Touch.TAP:
-                # Calculate which app was tapped
+                # Calculate which app was tapped in grid
                 if y >= 40:
-                    tapped_index = (y - 40) // 25
-                    if tapped_index < len(self.apps):
+                    row = (y - 40) // 120
+                    col = (x - 10) // 100
+                    cols = 3
+                    tapped_index = row * cols + col
+                    if 0 <= tapped_index < len(self.apps):
                         if tapped_index != selected_index:
                             selected_index = tapped_index
                             self.select_app(selected_index)
@@ -129,10 +150,21 @@ class AppLauncher:
             direction, click = self.trackball.get_direction()
             if direction:
                 old_index = selected_index
-                if direction in ['up', 'left']:
-                    selected_index = max(0, selected_index - 1)
-                elif direction in ['down', 'right']:
-                    selected_index = min(len(self.apps) - 1, selected_index + 1)
+                cols = 3
+                rows = (len(self.apps) + cols - 1) // cols
+                current_row = selected_index // cols
+                current_col = selected_index % cols
+                if direction == 'up':
+                    current_row = max(0, current_row - 1)
+                elif direction == 'down':
+                    current_row = min(rows - 1, current_row + 1)
+                elif direction == 'left':
+                    current_col = max(0, current_col - 1)
+                elif direction == 'right':
+                    current_col = min(cols - 1, current_col + 1)
+                selected_index = current_row * cols + current_col
+                if selected_index >= len(self.apps):
+                    selected_index = len(self.apps) - 1
                 if selected_index != old_index:
                     self.select_app(selected_index)
                     self.sound.play_navigation()
