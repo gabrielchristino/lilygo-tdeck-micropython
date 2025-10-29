@@ -150,7 +150,7 @@ class AppLauncher:
             thumb_y = app_list_start_y + int((scrollbar_total_height - thumb_height) * scroll_ratio)
             
             self.display.fill_rect(scrollbar_x, app_list_start_y, scrollbar_width, scrollbar_total_height, st7789.GRAY) # Track
-            self.display.fill_rect(scrollbar_x, thumb_y, scrollbar_width, thumb_height, st7789.BLUE) # Thumb
+            self.display.fill_rect(scrollbar_x, thumb_y, scrollbar_width, thumb_height, st7789.WHITE) # Thumb
 
     def select_app(self, index):
         """Select an app by index and adjust scroll_offset if necessary."""
