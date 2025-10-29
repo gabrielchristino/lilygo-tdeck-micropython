@@ -143,10 +143,17 @@ if __name__ == "__main__":
             print("-" * 30)
             print(f"Resumo: {success_count} item(ns) atualizado(s) com sucesso, {fail_count} falha(s).")
             
-            # Após o upload de apps, o dispositivo precisa ser reiniciado
-            if any(upload_items[i]['type'] == 'app' for i in selected_indices if 0 <= i < len(upload_items)):
-                print("\nATENÇÃO: Um ou mais aplicativos foram atualizados.")
-                print("O dispositivo precisa ser reiniciado para que o processo de atualização interno seja executado.")
+            # Verifica se um reboot é necessário (upload de app ou do launcher)
+            uploaded_an_app = any(upload_items[i]['type'] == 'app' for i in selected_indices if 0 <= i < len(upload_items))
+            uploaded_launcher = any(upload_items[i]['name'] == 'lib/app_launcher.py' for i in selected_indices if 0 <= i < len(upload_items))
+
+            if uploaded_an_app or uploaded_launcher:
+                print("\nATENÇÃO:")
+                if uploaded_an_app:
+                    print("-> Um ou mais apps foram atualizados (requer reboot para instalar).")
+                if uploaded_launcher:
+                    print("-> O app_launcher.py foi atualizado (requer reboot para aplicar).")
+                
                 reboot_choice = input("Deseja reiniciar o dispositivo agora? (s/n): ").strip().lower()
                 if reboot_choice == 's':
                     run_command(['mpremote', 'reset'])

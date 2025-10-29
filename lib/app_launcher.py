@@ -59,11 +59,8 @@ class AppLauncher:
             else:
                 print(f"Erro de I/O ao escanear diretório de apps: {e}")
 
-    def draw_app_list(self):
-        """Draw the vertical list of available apps"""
-        self.display.fill(st7789.color565(20, 20, 20))  # Dark background
-
-        # --- Desenha a Barra de Status ---
+    def draw_status_bar(self):
+        """Desenha apenas a barra de status superior."""
         self.display.fill_rect(0, 0, self.display.width, STATUS_BAR_HEIGHT, STATUS_BAR_BG_COLOR)
 
         # Data e Hora
@@ -77,54 +74,68 @@ class AppLauncher:
         battery_x = self.display.width - (len(battery_str) * font.WIDTH) - 5
         self.display.text(font, battery_str, battery_x, 5, st7789.WHITE, STATUS_BAR_BG_COLOR)
 
-        # Título removido, a barra de status já serve como cabeçalho
+    def draw_app_item(self, index):
+        """Desenha um único item da lista de aplicativos na tela."""
+        # Verifica se o item está dentro da área visível
+        if not (self.scroll_offset <= index < self.scroll_offset + self.visible_items):
+            return
+
+        app = self.apps[index]
+        is_selected = (index == self.selected_index)
+
+        # Calcula a posição do item na tela
+        item_height = 40
+        app_list_start_y = STATUS_BAR_HEIGHT + 5
+        icon_size = 30
+        
+        # 'i' é a posição visível na tela (0, 1, 2, ...)
+        i = index - self.scroll_offset
+        y = i * item_height + app_list_start_y
+        x = 10
+
+        color = st7789.WHITE
+        bg_color = st7789.color565(40, 40, 40) if is_selected else st7789.color565(20, 20, 20)
+
+        # Desenha o fundo do item
+        item_width = self.display.width - (x * 2)
+        self.display.fill_rect(x, y, item_width, item_height - 2, bg_color)
+
+        # Desenha a borda de seleção
+        if is_selected:
+            self.display.rect(x - 2, y - 2, item_width + 4, item_height + 2, st7789.CYAN)
+        else:
+            # Apaga a borda antiga desenhando um retângulo com a cor de fundo geral
+            self.display.rect(x - 2, y - 2, item_width + 4, item_height + 2, st7789.color565(20, 20, 20))
+
+        # Desenha o ícone
+        if app['icon_path']:
+            icon_y = y + (item_height - icon_size) // 2
+            if app['icon_path'].endswith('.p4'):
+                self.display.draw_p4_transparent(app['icon_path'], x + 2, icon_y)
+
+        # Desenha o nome do app
+        self.display.text(font, app['name'][:25], x + icon_size + 10, y + 10, color, bg_color)
+
+    def draw_app_list(self):
+        """Draw the vertical list of available apps"""
+        self.display.fill(st7789.color565(20, 20, 20))  # Dark background
+
+        # --- Desenha a Barra de Status ---
+        self.display.fill_rect(0, 0, self.display.width, STATUS_BAR_HEIGHT, STATUS_BAR_BG_COLOR)
+
+        self.draw_status_bar() # Chama a função dedicada para a barra de status
 
         if not self.apps:
             self.display.text(font, "Nenhum app encontrado", 10, STATUS_BAR_HEIGHT + 30, st7789.GRAY, st7789.color565(20, 20, 20))
             return
 
         # --- Desenha a lista de apps com rolagem ---
-        item_height = 40
-        # Posição Y inicial da lista de apps (abaixo da barra de status e título)
         app_list_start_y = STATUS_BAR_HEIGHT + 5 # Começa logo abaixo da barra de status
-        icon_size = 30
-        
         for i in range(self.visible_items):
             index = self.scroll_offset + i
             if index >= len(self.apps):
                 break
-
-            app = self.apps[index]
-            is_selected = (index == self.selected_index)
-
-            # 'i' é o índice visível na tela, 'index' é o índice real na lista de apps
-            y = i * item_height + app_list_start_y
-            x = 10
-
-            color = st7789.WHITE
-            bg_color = st7789.color565(40, 40, 40) if is_selected else st7789.color565(20, 20, 20)
-
-            # Draw item background
-            item_width = self.display.width - (x * 2)
-            self.display.fill_rect(x, y, item_width, item_height - 2, bg_color)
-
-            # Draw selection border
-            if is_selected:
-                self.display.rect(x - 2, y - 2, item_width + 4, item_height + 2, st7789.CYAN) # Use HIGHLIGHT_COLOR
-
-            # Draw icon
-            if app['icon_path']:
-                icon_y = y + (item_height - icon_size) // 2
-                if app['icon_path'].endswith('.p4'):
-                    self.display.draw_p4_transparent(app['icon_path'], x + 2, icon_y)
-                elif app['icon_path'].endswith('.bmp'):
-                    try:
-                        self.display.draw_bmp(app['icon_path'], x + 2, icon_y)
-                    except Exception:
-                        self.display.fill_rect(x + 2, icon_y, icon_size, icon_size, st7789.RED)
-            
-            # Draw app name
-            self.display.text(font, app['name'][:25], x + icon_size + 10, y + 10, color, bg_color)
+            self.draw_app_item(index)
 
         # Draw scrollbar
         if len(self.apps) > self.visible_items:
@@ -145,12 +156,16 @@ class AppLauncher:
         """Select an app by index and adjust scroll_offset if necessary."""
         if 0 <= index < len(self.apps):
             self.selected_index = index
+            old_scroll_offset = self.scroll_offset
+            
             # Adjust scroll_offset to keep selected_index visible
             if self.selected_index < self.scroll_offset:
                 self.scroll_offset = self.selected_index
             elif self.selected_index >= self.scroll_offset + self.visible_items:
                 self.scroll_offset = self.selected_index - self.visible_items + 1
-            return True
+            
+            # Retorna True apenas se a rolagem da tela mudou.
+            return old_scroll_offset != self.scroll_offset
         return False
 
     def reset_icon_cache(self):
@@ -182,48 +197,53 @@ class AppLauncher:
         self.scan_apps()
         
         if not self.apps:
-            self.draw_app_list() # Draw "No apps found" message
+            self.draw_app_list() # Desenha a mensagem "Nenhum app encontrado"
             while True: time.sleep_ms(100) # Wait indefinitely
 
         self.selected_index = 0
-        self.select_app(self.selected_index) # Ensure scroll_offset is correct
-        
+        self.select_app(self.selected_index) # Garante que o scroll_offset está correto
+        self.draw_app_list() # Desenha a lista inicial
+
+        last_status_update = time.ticks_ms()
+
         while True:
-            self.draw_app_list() # Redraw the entire list after an action
-            
-            # Loop de entrada
-            while True:
-                key = None # No keyboard input for launcher
-                direction, click = self.trackball.get_direction()
+            key = None # Sem entrada de teclado para o launcher
+            direction, click = self.trackball.get_direction()
 
-                # Handle trackball input
-                if direction:
-                    old_selected_index = self.selected_index
-                    if direction == 'up':
-                        self.selected_index = max(0, self.selected_index - 1)
-                    elif direction == 'down':
-                        self.selected_index = min(len(self.apps) - 1, self.selected_index + 1)
-                    
-                    if self.selected_index != old_selected_index:
-                        self.select_app(self.selected_index) # This will also adjust scroll_offset
-                        self.sound.play_navigation()
-                        break # Break to redraw
+            # Lida com a entrada do trackball
+            if direction:
+                old_selected_index = self.selected_index
+                if direction == 'up':
+                    self.selected_index = max(0, self.selected_index - 1)
+                elif direction == 'down':
+                    self.selected_index = min(len(self.apps) - 1, self.selected_index + 1)
+                
+                if self.selected_index != old_selected_index:
+                    self.sound.play_navigation()
+                    # Verifica se a rolagem mudou. Se sim, redesenha tudo.
+                    if self.select_app(self.selected_index):
+                        self.draw_app_list()
+                    else:
+                        # Se não houve rolagem, redesenha apenas os itens afetados
+                        self.draw_app_item(old_selected_index)
+                        self.draw_app_item(self.selected_index)
 
-                if click:
-                    self.sound.play_confirm()
-                    # Launch the app, and if it runs successfully...
-                    if self.launch_selected_app():
-                        # ...reset the selection and redraw the launcher screen.
-                        gc.collect() # Força a coleta de lixo para liberar memória
-                        self.scan_apps() # Re-scan apps in case something changed
-                        # Ensure selected_index is still valid after scan (apps might have changed)
-                        if self.selected_index >= len(self.apps):
-                            self.selected_index = max(0, len(self.apps) - 1)
-                        self.select_app(self.selected_index) # Re-select to refresh state and scroll
-                        break # Break to redraw
+            if click:
+                self.sound.play_confirm()
+                # Lança o app, e se ele rodar com sucesso...
+                if self.launch_selected_app():
+                    # ...reseta a seleção e redesenha a tela do launcher.
+                    gc.collect() # Força a coleta de lixo para liberar memória
+                    self.scan_apps() # Re-escaneia os apps caso algo tenha mudado
+                    # Garante que o selected_index ainda é válido após o scan
+                    if self.selected_index >= len(self.apps):
+                        self.selected_index = max(0, len(self.apps) - 1)
+                    self.select_app(self.selected_index) # Re-seleciona para atualizar o estado e o scroll
+                    self.draw_app_list() # Redesenha a tela após o app fechar
 
-                # Atualiza a barra de status periodicamente sem quebrar o loop de entrada
-                # (Isso é uma otimização para o relógio, mas redesenhar tudo ainda é aceitável)
-                # Para uma atualização mais suave, seria necessário um timer.
-                # Por simplicidade, o relógio só atualiza quando uma ação ocorre.
-                time.sleep_ms(50)
+            # Atualiza a barra de status (relógio) a cada segundo sem redesenhar tudo
+            if time.ticks_diff(time.ticks_ms(), last_status_update) > 1000:
+                self.draw_status_bar()
+                last_status_update = time.ticks_ms()
+
+            time.sleep_ms(50)
