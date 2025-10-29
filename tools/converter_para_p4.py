@@ -90,9 +90,9 @@ if __name__ == "__main__":
         for dir_name in os.listdir(APP_BASE_PATH):
             app_path = os.path.join(APP_BASE_PATH, dir_name)
             if os.path.isdir(app_path):
-                bmp_icon = os.path.join(app_path, '__icon__.bmp')
+                png_icon = os.path.join(app_path, '__icon__.png') # Procura por .png
                 p4_icon = os.path.join(app_path, '__icon__.p4')
-                if os.path.exists(bmp_icon):
+                if os.path.exists(png_icon):
                     print(f"Encontrado ícone em '{dir_name}':")
-                    convert_to_p4(bmp_icon, p4_icon)
+                    convert_to_p4(png_icon, p4_icon) # Converte o .png
         print("Conversão concluída.")

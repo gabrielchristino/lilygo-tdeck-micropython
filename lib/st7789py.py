@@ -1264,6 +1264,51 @@ class ST7789:
         except Exception as e:
             print(f"Erro ao desenhar P4 {filename}: {e}")
 
+    def draw_p4_transparent(self, filename, x, y):
+        """
+        Draw a P4 file with transparency.
+        Pixels mapped to palette index 0 are skipped.
+        This is slower than draw_p4 due to pixel-by-pixel checking.
+        """
+        try:
+            with open(filename, 'rb') as f:
+                dims = f.read(2)
+                if len(dims) != 2: return
+                width, height = dims[0], dims[1]
+
+                palette_data = f.read(32)
+                if len(palette_data) != 32: return
+
+                palette = [struct.unpack('>H', palette_data[i:i+2])[0] for i in range(0, 32, 2)]
+
+                # Otimização: Pré-troca de bytes da paleta se necessário
+                if not self.needs_swap:
+                    swapped_palette = palette
+                else:
+                    swapped_palette = [((c << 8) & 0xFF00) | (c >> 8) for c in palette]
+
+                # Processa a imagem linha por linha
+                for r in range(height):
+                    # Define a janela para a linha atual
+                    self._set_window(x, y + r, x + width - 1, y + r)
+                    
+                    row_indices_data = f.read(width // 2)
+                    if len(row_indices_data) != width // 2: break
+
+                    # Desenha pixels não transparentes da linha
+                    for i in range(width // 2):
+                        packed_byte = row_indices_data[i]
+                        idx1 = packed_byte >> 4
+                        idx2 = packed_byte & 0x0F
+
+                        if idx1 != 0:
+                            self.pixel(x + i * 2, y + r, swapped_palette[idx1])
+                        if idx2 != 0:
+                            self.pixel(x + i * 2 + 1, y + r, swapped_palette[idx2])
+
+        except Exception as e:
+            print(f"Erro ao desenhar P4 transparente {filename}: {e}")
+
     @micropython.native
     def polygon(self, points, x, y, color, angle=0, center_x=0, center_y=0):
         """

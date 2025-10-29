@@ -116,7 +116,7 @@ class AppLauncher:
             if app['icon_path']:
                 icon_y = y + (item_height - icon_size) // 2
                 if app['icon_path'].endswith('.p4'):
-                    self.display.draw_p4(app['icon_path'], x + 2, icon_y)
+                    self.display.draw_p4_transparent(app['icon_path'], x + 2, icon_y)
                 elif app['icon_path'].endswith('.bmp'):
                     try:
                         self.display.draw_bmp(app['icon_path'], x + 2, icon_y)
