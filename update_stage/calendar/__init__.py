@@ -14,6 +14,7 @@ BG_COLOR = st7789.color565(20, 20, 30)
 TEXT_COLOR = st7789.WHITE
 HEADER_COLOR = st7789.YELLOW
 HIGHLIGHT_COLOR = st7789.CYAN
+INPUT_BG_COLOR = st7789.color565(30, 30, 50) # Cor do fundo da caixa de texto
 EVENT_INDICATOR_COLOR = st7789.RED
 KBD_I2C_ADDR = 0x55
 EVENTS_DIR = '/sd/app/calendar/events'
@@ -88,9 +89,9 @@ class CalendarApp:
 
     def _confirm_delete_ui(self):
         """Mostra uma UI de confirmação para apagar um evento."""
-        self.display.fill_rect(40, 80, 240, 80, BG_COLOR)
-        self.display.rect(40, 80, 240, 80, HEADER_COLOR)
-        self.display.text(font, "Apagar este evento?", 50, 95, TEXT_COLOR, BG_COLOR)
+        self.display.fill_rect(40, 80, 240, 80, BG_COLOR) # Limpa a área do modal
+        self.display.rect(40, 80, 240, 80, HIGHLIGHT_COLOR) # Borda Ciano
+        self.display.text(font, "Apagar este evento?", 60, 95, TEXT_COLOR, BG_COLOR)
         
         confirm_focus = 'no' # 'yes' ou 'no'
         
@@ -103,10 +104,9 @@ class CalendarApp:
             direction, click = self.trackball.get_direction()
             key = self.get_key_simple()
 
-            if direction:
-                if direction in ['left', 'right']:
-                    confirm_focus = 'yes' if confirm_focus == 'no' else 'no'
-                    self.sound.play_navigation()
+            if direction and direction in ['left', 'right']:
+                confirm_focus = 'yes' if confirm_focus == 'no' else 'no'
+                self.sound.play_navigation()
             
             if click or (key and key == b'\r'):
                 self.sound.play_confirm()
@@ -140,56 +140,7 @@ class CalendarApp:
         # Desenha o botão Apagar
         is_del_button_focused = (editor_focus == 'delete_button')
         del_color = HIGHLIGHT_COLOR if is_del_button_focused else TEXT_COLOR
-        self.display.text(font, "[ Apagar ]", 100, 225, del_color, BG_COLOR)
-
-    def _handle_event_editor_input(self, content, editor_focus, filepath):
-        """Processa a entrada do usuário no editor de eventos."""
-        key = self.get_key_simple()
-        direction, click = self.trackball.get_direction()
-
-        # --- Navegação de Foco ---
-        if direction:
-            if direction == 'up' and editor_focus in ['save_button', 'delete_button']:
-                editor_focus = 'text'
-                self.sound.play_navigation()
-            elif direction == 'down' and editor_focus == 'text':
-                editor_focus = 'save_button'
-                self.sound.play_navigation()
-            elif direction == 'left' and editor_focus == 'delete_button':
-                editor_focus = 'save_button'
-                self.sound.play_navigation()
-            elif direction == 'right' and editor_focus == 'save_button':
-                editor_focus = 'delete_button'
-                self.sound.play_navigation()
-
-        # --- Ações ---
-        action_triggered = click or (key and key == b'\r')
-
-        if action_triggered and editor_focus == 'save_button':
-            self.sound.play_confirm()
-            try:
-                with open(filepath, 'w') as f:
-                    f.write(content)
-            except OSError: pass # Falha silenciosa
-            return None, None, True # content, editor_focus, should_exit
-        
-        elif action_triggered and editor_focus == 'delete_button':
-            if self._confirm_delete_ui():
-                try:
-                    _os.remove(filepath)
-                except OSError: pass # Arquivo já não existia
-                return None, None, True # Sair após apagar
-            # Se não confirmou, o loop principal redesenha o editor
-
-        elif key and editor_focus == 'text': # Edição de texto
-            if key == b'\r': content += '\n'
-            elif key == b'\x08': content = content[:-1]
-            else:
-                try: content += key.decode('utf-8')
-                except UnicodeError: pass
-            self.sound.play_keypress()
-
-        return content, editor_focus, False
+        self.display.text(font, "[ Apagar ]", 120, 225, del_color, BG_COLOR)
 
     def edit_event_ui(self, year, month, day):
         """Abre uma UI para editar o evento de um dia específico."""
@@ -205,12 +156,60 @@ class CalendarApp:
         self.draw_header(f"Evento: {day}/{month}/{year}")
 
         while True:
-            self._draw_event_editor(content, editor_focus)
-            content, editor_focus, should_exit = self._handle_event_editor_input(content, editor_focus, filepath)
-            if should_exit:
-                return
+            # --- Loop Externo: Desenha a tela ---
+            self.display.fill_rect(0, 40, self.display.width, 200, BG_COLOR) # Limpa área de conteúdo
+            
+            # Desenha a área de texto (semelhante à caixa de texto do notepad)
+            lines = content.split('\n')
+            for i, line in enumerate(lines):
+                if i > 10: break # Limita linhas visíveis
+                self.display.text(font, line, 10, 40 + i * (font.HEIGHT + 2), TEXT_COLOR, BG_COLOR)
 
-            time.sleep_ms(20)
+            # Desenha botões
+            save_color = HIGHLIGHT_COLOR if editor_focus == 'save_button' else TEXT_COLOR
+            del_color = HIGHLIGHT_COLOR if editor_focus == 'delete_button' else TEXT_COLOR
+            self.display.text(font, "[ Salvar ]", 10, 225, save_color, BG_COLOR)
+            self.display.text(font, "[ Apagar ]", 120, 225, del_color, BG_COLOR)
+            
+            # --- Loop Interno: Aguarda entrada ---
+            while True:
+                key = self.get_key_simple()
+                direction, click = self.trackball.get_direction()
+
+                # Processa teclado (edição de texto)
+                if key:
+                    if key == b'\r': content += '\n'
+                    elif key == b'\x08': content = content[:-1]
+                    else:
+                        try: content += key.decode('utf-8')
+                        except UnicodeError: pass
+                    self.sound.play_keypress()
+                    break # Quebra para redesenhar o texto
+
+                # Processa navegação do trackball
+                if direction:
+                    if direction in ['left', 'right']:
+                        editor_focus = 'delete_button' if editor_focus == 'save_button' else 'save_button'
+                        self.sound.play_navigation()
+                        break # Quebra para redesenhar o foco
+
+                # Processa cliques do trackball
+                if click:
+                    if editor_focus == 'save_button':
+                        self.sound.play_confirm()
+                        try:
+                            with open(filepath, 'w') as f: f.write(content)
+                        except OSError: pass
+                        return # Sai da tela de edição
+                    elif editor_focus == 'delete_button':
+                        if self._confirm_delete_ui():
+                            try: _os.remove(filepath)
+                            except OSError: pass
+                            return # Sai da tela de edição
+                        else:
+                            break # Redesenha a tela se o usuário cancelou
+                
+                time.sleep_ms(20)
 
     def draw_calendar_ui(self):
         """Desenha a UI principal do calendário."""
@@ -270,7 +269,7 @@ class CalendarApp:
                 # --- Processa a navegação e ações ---
                 if key:
                     if key == b'a' or key == b'A': # Mês anterior
-                        self.month -= 1
+                        self.month -= 1 # type: ignore
                         if self.month < 1:
                             self.month = 12
                             self.year -= 1
@@ -278,7 +277,7 @@ class CalendarApp:
                         break
                     elif key == b'd' or key == b'D': # Próximo mês
                         self.month += 1
-                        if self.month > 12:
+                        if self.month > 12: # type: ignore
                             self.month = 1
                             self.year += 1
                         self.load_events_for_month()
@@ -300,7 +299,7 @@ class CalendarApp:
                         if direction == 'up': self.focused_element = 'calendar' # Volta para o calendário
                     
                     self.sound.play_navigation()
-                    break
+                    break # Quebra para redesenhar a seleção
 
                 if click:
                     if self.focused_element == 'calendar':
@@ -310,7 +309,7 @@ class CalendarApp:
                         break
                     elif self.focused_element == 'exit':
                         return # Fecha o app
-
+                
                 time.sleep_ms(50)
 
 # --- Ponto de Entrada do App ---
