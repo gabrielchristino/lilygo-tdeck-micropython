@@ -86,6 +86,57 @@ class CalendarApp:
                 except (ValueError, IndexError):
                     pass
 
+    def _draw_event_editor(self, content, editor_focus):
+        """Desenha a UI do editor de eventos."""
+        # Limpa a área de texto e o rodapé
+        self.display.fill_rect(10, 40, self.display.width - 20, 170, BG_COLOR)
+        self.display.fill_rect(0, 220, self.display.width, 20, BG_COLOR)
+        
+        # Divide o conteúdo em linhas e desenha cada uma
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if i > 18: break # Limita o número de linhas visíveis
+            self.display.text(font, line, 15, 46 + i * (font.HEIGHT + 2), TEXT_COLOR, BG_COLOR)
+        
+        # Desenha o botão Salvar
+        is_button_focused = (editor_focus == 'save_button')
+        button_color = HIGHLIGHT_COLOR if is_button_focused else TEXT_COLOR
+        self.display.text(font, "[ Salvar ]", 10, 225, button_color, BG_COLOR)
+
+    def _handle_event_editor_input(self, content, editor_focus, filepath):
+        """Processa a entrada do usuário no editor de eventos."""
+        key = self.get_key_simple()
+        direction, click = self.trackball.get_direction()
+
+        # Navegação com Trackball (foco)
+        if direction:
+            if direction == 'up' and editor_focus == 'save_button':
+                editor_focus = 'text'
+                self.sound.play_navigation()
+            elif direction == 'down' and editor_focus == 'text':
+                editor_focus = 'save_button'
+                self.sound.play_navigation()
+
+        # Ação de Clique ou Enter no botão Salvar
+        if (click and editor_focus == 'save_button') or (key and key == b'\r' and editor_focus == 'save_button'):
+            self.sound.play_confirm()
+            try:
+                with open(filepath, 'w') as f:
+                    f.write(content)
+            except OSError: pass # Falha silenciosa
+            return None, None, True # content, editor_focus, should_exit
+
+        # Edição de texto
+        if key and editor_focus == 'text':
+            if key == b'\r': content += '\n'
+            elif key == b'\x08': content = content[:-1]
+            else:
+                try: content += key.decode('utf-8')
+                except UnicodeError: pass
+            self.sound.play_keypress()
+
+        return content, editor_focus, False
+
     def edit_event_ui(self, year, month, day):
         """Abre uma UI para editar o evento de um dia específico."""
         filename = f"{year:04d}-{month:02d}-{day:02d}.txt"
@@ -94,66 +145,17 @@ class CalendarApp:
         try:
             with open(filepath, 'r') as f:
                 content = f.read()
-        except OSError:
-            pass # Arquivo não existe ainda
+        except OSError: pass # Arquivo não existe ainda
 
         editor_focus = 'text' # 'text' ou 'save_button'
-
         self.draw_header(f"Evento: {day}/{month}/{year}")
 
         while True:
-            # --- Desenho da UI ---
-            # Limpa a área de texto e o rodapé
-            self.display.fill_rect(10, 40, self.display.width - 20, 170, BG_COLOR)
-            self.display.fill_rect(0, 220, self.display.width, 20, BG_COLOR)
-            
-            # Divide o conteúdo em linhas e desenha cada uma
-            lines = content.split('\n')
-            for i, line in enumerate(lines):
-                # Limita o número de linhas visíveis para não estourar a tela
-                if i > 18: break 
-                self.display.text(font, line, 15, 46 + i * (font.HEIGHT + 2), TEXT_COLOR, BG_COLOR)
-            
-            # Desenha o botão Salvar
-            is_button_focused = (editor_focus == 'save_button')
-            button_color = HIGHLIGHT_COLOR if is_button_focused else TEXT_COLOR
-            self.display.text(font, "[ Salvar ]", 10, 225, button_color, BG_COLOR)
+            self._draw_event_editor(content, editor_focus)
+            content, editor_focus, should_exit = self._handle_event_editor_input(content, editor_focus, filepath)
+            if should_exit:
+                return
 
-            # --- Processamento de Entrada ---
-            key = self.get_key_simple()
-            direction, click = self.trackball.get_direction()
-
-            # Navegação com Trackball
-            if direction:
-                if direction == 'up' and editor_focus == 'save_button':
-                    editor_focus = 'text'
-                    self.sound.play_navigation()
-                elif direction == 'down' and editor_focus == 'text':
-                    editor_focus = 'save_button'
-                    self.sound.play_navigation()
-
-            # Ação de Clique (Salvar)
-            if click and editor_focus == 'save_button':
-                key = b'\r' # Simula um Enter para entrar na lógica de salvar
-
-            # Processamento de Teclas
-            if key:
-                if editor_focus == 'save_button' and key == b'\r': # Salvar com Enter
-                    self.sound.play_confirm()
-                    try:
-                        with open(filepath, 'w') as f:
-                            f.write(content)
-                    except Exception:
-                        pass # Falha silenciosa por enquanto
-                    return # Volta para a tela do calendário
-                elif editor_focus == 'text': # Edição de texto
-                    if key == b'\r': content += '\n'
-                    elif key == b'\x08': content = content[:-1]
-                    else:
-                        try: content += key.decode('utf-8')
-                        except UnicodeError: pass
-                    self.sound.play_keypress()
-            
             time.sleep_ms(20)
 
     def draw_calendar_ui(self):

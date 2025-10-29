@@ -39,13 +39,13 @@ class App:
         """Tenta sincronizar o RTC via NTP e exibe o status."""
         # Limpa a área de mensagens e exibe o status
         self.display.fill_rect(0, 80, self.display.width, 40, BG_COLOR)
-        self.display.text(font, "Sincronizando hora...", 10, 80, TEXT_COLOR, BG_COLOR)
+        self.display.text(font, "Sincronizando hora...", 10, 80, TEXT_COLOR, BG_COLOR) # type: ignore
         try:
             # ntptime.settime() pode levar alguns segundos e levanta uma exceção em caso de falha
             ntptime.settime()
-            self.display.text(font, "Hora atualizada com sucesso!", 10, 100, SUCCESS_COLOR, BG_COLOR)
-        except Exception:
-            self.display.text(font, "Falha ao sincronizar hora.", 10, 100, ERROR_COLOR, BG_COLOR)
+            self.display.text(font, "Hora atualizada com sucesso!", 10, 100, SUCCESS_COLOR, BG_COLOR) # type: ignore
+        except (OSError, AttributeError): # OSError para falha de rede, AttributeError se ntptime não estiver pronto
+            self.display.text(font, "Falha ao sincronizar hora.", 10, 100, ERROR_COLOR, BG_COLOR) # type: ignore
         time.sleep(2) # Pausa para o usuário ler a mensagem
 
     def load_known_networks(self):
@@ -112,7 +112,7 @@ class App:
             self.wlan.active(False) # Desliga o WiFi se falhou
 
 # --- Ponto de Entrada do App ---
-try:
+try: # type: ignore
     app = App(display, touch, trackball, i2c, sound)
     app.run()
 except Exception as e:

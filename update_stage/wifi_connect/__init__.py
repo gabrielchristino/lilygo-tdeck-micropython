@@ -55,10 +55,8 @@ class App:
         """Salva uma nova rede no arquivo."""
         try:
             with open(KNOWN_NETWORKS_FILE, 'a') as f:
-                f.write(f"{ssid}:{password}\n")
-            print(f"Rede '{ssid}' salva.")
-        except Exception as e:
-            print(f"Erro ao salvar rede: {e}")
+                f.write(f"{ssid}:{password}\n") # type: ignore
+        except OSError: pass # Falha silenciosa ao salvar
 
     def get_key_simple(self):
         """Lê uma tecla do teclado, sem importar bibliotecas externas."""
@@ -71,13 +69,11 @@ class App:
         return None
 
     def run(self):
-        print("Executando WiFi Connect App (Robusto)")
-
         # --- ETAPA 1: Ligar WiFi e Escanear ---
         self.wlan.active(True)
         self.draw_header("WiFi Connect")
         self.display.text(font, "Escaneando redes...", 10, 50, TEXT_COLOR, BG_COLOR)
-
+ # type: ignore
         try:
             networks = self.wlan.scan()
         except Exception as e:
@@ -85,7 +81,6 @@ class App:
             networks = []
 
         # --- ETAPA 2: DESLIGAR o WiFi para a UI ---
-        print("Desativando WiFi para a UI...")
         self.wlan.active(False)
         time.sleep_ms(100)
         
@@ -139,7 +134,6 @@ class App:
 
     def attempt_connection(self, ssid, password):
         try:
-            print("Reativando WiFi para conectar...")
             self.wlan.active(True)
             time.sleep_ms(500)
             self.draw_header("Conectando...")
@@ -200,7 +194,7 @@ class App:
                 time.sleep_ms(50)
 
 # --- Ponto de Entrada do App ---
-try:
+try: # type: ignore
     app = App(display, touch, trackball, i2c, sound)
     app.run()
 except Exception as e:

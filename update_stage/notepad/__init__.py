@@ -55,8 +55,7 @@ class NotepadApp:
                 with open(f"{NOTES_DIR}/{filename}", 'r') as f:
                     preview = f.readline().strip() # Lê apenas a primeira linha
                     self.notes.append({'filename': filename, 'preview': preview})
-            except Exception:
-                pass # Ignora arquivos que não podem ser lidos
+            except OSError: pass # Ignora arquivos que não podem ser lidos
 
     def save_note(self, content, filename=None):
         """Salva o conteúdo em um arquivo de nota."""
@@ -71,17 +70,15 @@ class NotepadApp:
         try:
             with open(filepath, 'w') as f:
                 f.write(content)
-            self.load_notes() # Recarrega a lista de notas
-        except Exception:
-            pass # Falha silenciosa
+            self.load_notes() # Recarrega a lista de notas após salvar
+        except OSError: pass # Falha silenciosa
 
     def read_note_content(self, filename):
         """Lê o conteúdo de um arquivo de nota."""
         filepath = f"{NOTES_DIR}/{filename}"
         try:
             with open(filepath, 'r') as f: return f.read()
-        except Exception:
-            return ""
+        except OSError: return ""
 
     def draw_main_ui(self):
         """Desenha a UI principal com a lista de notas e a caixa de nova nota."""
@@ -179,7 +176,7 @@ class NotepadApp:
                 time.sleep_ms(50)
 
 # --- Ponto de Entrada do App ---
-try:
+try: # type: ignore
     app = NotepadApp(display, touch, trackball, i2c, sound)
     app.run()
 except Exception as e:
