@@ -203,9 +203,5 @@ class App:
 try:
     app = App(display, touch, trackball, i2c, sound)
     app.run()
-    print("WiFi Connect App encerrado.")
-    app.draw_header("WiFi Connect")
-    app.display.text(font, "App encerrado.", 10, 60, TEXT_COLOR, BG_COLOR)
-    time.sleep(2)
 except Exception as e:
     print(f"!!! ERRO ao instanciar ou rodar a classe App: {e}")

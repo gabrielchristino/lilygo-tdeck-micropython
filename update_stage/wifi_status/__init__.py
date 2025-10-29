@@ -40,15 +40,12 @@ class App:
         # Limpa a área de mensagens e exibe o status
         self.display.fill_rect(0, 80, self.display.width, 40, BG_COLOR)
         self.display.text(font, "Sincronizando hora...", 10, 80, TEXT_COLOR, BG_COLOR)
-        print("Tentando sincronizar a hora via NTP...")
         try:
             # ntptime.settime() pode levar alguns segundos e levanta uma exceção em caso de falha
             ntptime.settime()
             self.display.text(font, "Hora atualizada com sucesso!", 10, 100, SUCCESS_COLOR, BG_COLOR)
-            print("Hora sincronizada com sucesso.")
-        except Exception as e:
+        except Exception:
             self.display.text(font, "Falha ao sincronizar hora.", 10, 100, ERROR_COLOR, BG_COLOR)
-            print(f"Falha ao sincronizar hora: {e}")
         time.sleep(2) # Pausa para o usuário ler a mensagem
 
     def load_known_networks(self):
@@ -67,8 +64,6 @@ class App:
         return known_networks
 
     def run(self):
-        print("Executando WiFi Status App")
-        
         # Ativa o Wi-Fi para todas as operações
         self.wlan.active(True)
         time.sleep_ms(200) # Pausa para o hardware inicializar
@@ -115,8 +110,6 @@ class App:
         else:
             self.show_message("Falha!", "Nao conectou a nenhuma rede.", ERROR_COLOR)
             self.wlan.active(False) # Desliga o WiFi se falhou
-
-        print("WiFi Status App encerrado.")
 
 # --- Ponto de Entrada do App ---
 try:

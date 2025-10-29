@@ -55,8 +55,8 @@ class NotepadApp:
                 with open(f"{NOTES_DIR}/{filename}", 'r') as f:
                     preview = f.readline().strip() # Lê apenas a primeira linha
                     self.notes.append({'filename': filename, 'preview': preview})
-            except Exception as e:
-                print(f"Erro ao ler prévia de {filename}: {e}")
+            except Exception:
+                pass # Ignora arquivos que não podem ser lidos
 
     def save_note(self, content, filename=None):
         """Salva o conteúdo em um arquivo de nota."""
@@ -71,19 +71,16 @@ class NotepadApp:
         try:
             with open(filepath, 'w') as f:
                 f.write(content)
-            print(f"Nota salva: {filepath}")
             self.load_notes() # Recarrega a lista de notas
-        except Exception as e:
-            print(f"Erro ao salvar nota: {e}")
+        except Exception:
+            pass # Falha silenciosa
 
     def read_note_content(self, filename):
         """Lê o conteúdo de um arquivo de nota."""
         filepath = f"{NOTES_DIR}/{filename}"
         try:
-            with open(filepath, 'r') as f:
-                return f.read()
-        except Exception as e:
-            print(f"Erro ao ler nota: {e}")
+            with open(filepath, 'r') as f: return f.read()
+        except Exception:
             return ""
 
     def draw_main_ui(self):
@@ -122,7 +119,6 @@ class NotepadApp:
 
     def run(self):
         """Loop principal do aplicativo."""
-        print("Executando Bloco de Notas")
         self.load_notes()
 
         while True:
@@ -169,7 +165,6 @@ class NotepadApp:
 
                 # Processa o clique do trackball para Sair
                 if click and self.focused_element == 'exit':
-                    print("Saindo do Bloco de Notas...")
                     return # Termina o método run() e fecha o app
 
                 # Processa o clique do trackball para editar uma nota

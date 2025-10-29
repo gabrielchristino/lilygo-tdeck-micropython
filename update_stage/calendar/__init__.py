@@ -85,7 +85,6 @@ class CalendarApp:
                     self.events[day] = True
                 except (ValueError, IndexError):
                     pass
-        print(f"Eventos carregados para {self.month}/{self.year}: {self.events}")
 
     def edit_event_ui(self, year, month, day):
         """Abre uma UI para editar o evento de um dia específico."""
@@ -115,11 +114,10 @@ class CalendarApp:
                 if i > 18: break 
                 self.display.text(font, line, 15, 46 + i * (font.HEIGHT + 2), TEXT_COLOR, BG_COLOR)
             
-            # Desenha o botão Salvar e a instrução
+            # Desenha o botão Salvar
             is_button_focused = (editor_focus == 'save_button')
             button_color = HIGHLIGHT_COLOR if is_button_focused else TEXT_COLOR
             self.display.text(font, "[ Salvar ]", 10, 225, button_color, BG_COLOR)
-            self.display.text(font, "Enter: Nova Linha", 120, 225, TEXT_COLOR, BG_COLOR)
 
             # --- Processamento de Entrada ---
             key = self.get_key_simple()
@@ -145,9 +143,8 @@ class CalendarApp:
                     try:
                         with open(filepath, 'w') as f:
                             f.write(content)
-                        print(f"Evento salvo: {filepath}")
-                    except Exception as e:
-                        print(f"Erro ao salvar evento: {e}")
+                    except Exception:
+                        pass # Falha silenciosa por enquanto
                     return # Volta para a tela do calendário
                 elif editor_focus == 'text': # Edição de texto
                     if key == b'\r': content += '\n'
@@ -205,7 +202,6 @@ class CalendarApp:
 
     def run(self):
         """Loop principal do aplicativo."""
-        print("Executando Calendário")
         self.load_events_for_month()
 
         while True:
@@ -257,7 +253,6 @@ class CalendarApp:
                         self.load_events_for_month() # Recarrega eventos caso um novo tenha sido criado
                         break
                     elif self.focused_element == 'exit':
-                        print("Saindo do Calendário...")
                         return # Fecha o app
 
                 time.sleep_ms(50)
@@ -267,7 +262,6 @@ try:
     app = CalendarApp(display, touch, trackball, i2c, sound)
     app.run()
 except Exception as e:
-    print(f"!!! ERRO ao executar Calendário: {e}")
     _display = globals().get('display')
     if _display:
         _display.fill(st7789.RED)
