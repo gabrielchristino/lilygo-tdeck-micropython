@@ -177,6 +177,7 @@ class AppLauncher:
                             if self.launch_selected_app():
                                 # App finished, reset state and redraw
                                 self.scan_apps() # Re-scan apps in case something changed
+                                gc.collect() # Força a coleta de lixo para liberar memória
                                 self.select_app(selected_index) # Re-select to refresh state
                                 self.draw_app_list() # Full redraw after app closes
 
@@ -205,6 +206,8 @@ class AppLauncher:
                 # Launch the app, and if it runs successfully...
                 if self.launch_selected_app():
                     # ...reset the selection and redraw the launcher screen.
+                    gc.collect() # Força a coleta de lixo para liberar memória
+                    print(f"Memória livre após fechar app: {gc.mem_free()} bytes")
                     self.select_app(selected_index)
                     self.draw_app_list() # Redesenho completo após sair do app
 
