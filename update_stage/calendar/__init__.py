@@ -157,13 +157,20 @@ class CalendarApp:
 
         while True:
             # --- Loop Externo: Desenha a tela ---
-            self.display.fill_rect(0, 40, self.display.width, 200, BG_COLOR) # Limpa área de conteúdo
+            # Limpa a área de conteúdo, mas preserva o cabeçalho
+            self.display.fill_rect(0, 35, self.display.width, 205, BG_COLOR)
+
+            # Define a área da caixa de texto e desenha o fundo e o contorno
+            text_area_x, text_area_y = 8, 38
+            text_area_w, text_area_h = self.display.width - 16, 180
+            self.display.fill_rect(text_area_x, text_area_y, text_area_w, text_area_h, INPUT_BG_COLOR)
+            self.display.rect(text_area_x, text_area_y, text_area_w, text_area_h, TEXT_COLOR)
             
-            # Desenha a área de texto (semelhante à caixa de texto do notepad)
+            # Desenha o texto do evento dentro da caixa
             lines = content.split('\n')
             for i, line in enumerate(lines):
-                if i > 10: break # Limita linhas visíveis
-                self.display.text(font, line, 10, 40 + i * (font.HEIGHT + 2), TEXT_COLOR, BG_COLOR)
+                if i > 17: break # Limita linhas visíveis para caber na caixa
+                self.display.text(font, line, text_area_x + 5, text_area_y + 5 + i * (font.HEIGHT + 2), TEXT_COLOR, INPUT_BG_COLOR)
 
             # Desenha botões
             save_color = HIGHLIGHT_COLOR if editor_focus == 'save_button' else TEXT_COLOR
