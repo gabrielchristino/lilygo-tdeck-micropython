@@ -97,26 +97,28 @@ class NotepadApp:
             is_list_item_focused = (self.focused_element == 'list' and i == self.selected_note_index)
             color = HIGHLIGHT_COLOR if is_list_item_focused else TEXT_COLOR
             # Mostra a prévia do conteúdo da nota
-            self.display.text(font, f"{note_file['preview'][:28]}", 10, y, color, BG_COLOR)
+            self.display.text(font, f"{note_file['preview'][:38]}", 10, y, color, BG_COLOR)
 
         # Desenha a caixa de entrada para nova nota
         is_input_focused = (self.focused_element == 'input')
         new_note_box_y = 200
+        input_width = self.display.width - 100 # Largura da caixa de texto
+        exit_button_x = input_width + 20 # Posição do botão Sair
         self.display.text(font, "Nova Nota:", 10, new_note_box_y - 12, TEXT_COLOR, BG_COLOR)
         
         # Desenha a caixa e a borda de foco
-        self.display.fill_rect(10, new_note_box_y, 180, 20, INPUT_BG_COLOR)
+        self.display.fill_rect(10, new_note_box_y, input_width, 20, INPUT_BG_COLOR)
         if is_input_focused:
-            self.display.rect(10, new_note_box_y, 180, 20, HIGHLIGHT_COLOR)
+            self.display.rect(10, new_note_box_y, input_width, 20, HIGHLIGHT_COLOR)
         else:
-            self.display.rect(10, new_note_box_y, 180, 20, TEXT_COLOR)
+            self.display.rect(10, new_note_box_y, input_width, 20, TEXT_COLOR)
             
         self.display.text(font, self.active_text, 15, new_note_box_y + 6, TEXT_COLOR, INPUT_BG_COLOR)
 
         # Desenha o botão Sair
         is_exit_focused = (self.focused_element == 'exit')
         color = HIGHLIGHT_COLOR if is_exit_focused else TEXT_COLOR
-        self.display.text(font, "[ Sair ]", 195, new_note_box_y + 6, color, BG_COLOR)
+        self.display.text(font, "[ Sair ]", exit_button_x, new_note_box_y + 6, color, BG_COLOR)
 
     def run(self):
         """Loop principal do aplicativo."""

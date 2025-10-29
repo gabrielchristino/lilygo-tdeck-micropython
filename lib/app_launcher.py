@@ -69,11 +69,12 @@ class AppLauncher:
         y = index * item_height + start_y
         x = 10
 
-        color = st7789.BLUE if is_selected else st7789.WHITE
+        color = st7789.WHITE # Texto sempre branco para melhor contraste
         bg_color = st7789.color565(40, 40, 40) if is_selected else st7789.color565(20, 20, 20)
 
         # Draw item background
-        self.display.fill_rect(x - 5, y - 2, 220, item_height - 4, bg_color)
+        item_width = self.display.width - (x * 2) # Usa a largura total com margens
+        self.display.fill_rect(x, y - 2, item_width, item_height - 4, bg_color)
 
         # Draw selection border
         if is_selected:
@@ -92,17 +93,19 @@ class AppLauncher:
                     self.display.fill_rect(x, icon_y, icon_size, icon_size, st7789.RED)
         
         # Draw app name (sem fundo para não cortar o ícone)
-        self.display.text(font, app['name'][:15], x + icon_size + 10, y + 10, color, bg_color)
+        self.display.text(font, app['name'][:30], x + icon_size + 10, y + 10, color, bg_color)
 
     def draw_app_list(self):
         """Draw the vertical list of available apps"""
         self.display.fill(st7789.color565(20, 20, 20))  # Dark background
 
         # Title
-        self.display.text(font, "APPS DISPONIVEIS", 30, 10, st7789.WHITE, st7789.color565(20, 20, 20))
+        title_text = "APPS DISPONIVEIS"
+        title_x = (self.display.width - len(title_text) * font.WIDTH) // 2
+        self.display.text(font, title_text, title_x, 10, st7789.WHITE, st7789.color565(20, 20, 20))
 
         if not self.apps:
-            self.display.text(font, "Nenhuma app encontrada", 10, 50, st7789.GRAY, st7789.color565(20, 20, 20))
+            self.display.text(font, "Nenhum app encontrado", 10, 50, st7789.GRAY, st7789.color565(20, 20, 20))
             self.display.text(font, "Crie diretorios em /sd/app", 10, 70, st7789.GRAY, st7789.color565(20, 20, 20))
             self.display.text(font, "com __init__.py", 10, 90, st7789.GRAY, st7789.color565(20, 20, 20))
             return

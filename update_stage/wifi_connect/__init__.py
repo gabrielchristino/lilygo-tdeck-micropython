@@ -109,13 +109,14 @@ class App:
 
     def get_password_ui_simple(self, ssid):
         """UI de entrada de senha simplificada, sem dependências externas."""
+        input_width = self.display.width - 20
         password = self.load_known_networks().get(ssid, "")
         self.draw_header(f"Senha para: {ssid[:20]}")
         self.display.text(font, "Enter para confirmar", 10, 220, TEXT_COLOR, BG_COLOR)
 
         while True:
-            self.display.fill_rect(10, 80, 220, 20, INPUT_BG_COLOR)
-            self.display.rect(10, 80, 220, 20, TEXT_COLOR)
+            self.display.fill_rect(10, 80, input_width, 20, INPUT_BG_COLOR)
+            self.display.rect(10, 80, input_width, 20, TEXT_COLOR)
             self.display.text(font, password, 15, 86, TEXT_COLOR, INPUT_BG_COLOR)
 
             key = self.get_key_simple()
@@ -129,7 +130,7 @@ class App:
                     password = password[:-1]
                 else:
                     try:
-                        if len(password) < 25:
+                        if len(password) < (input_width // font.WIDTH - 2):
                             password += key.decode('utf-8')
                     except UnicodeError:
                         pass
@@ -170,7 +171,7 @@ class App:
                 color = HIGHLIGHT_COLOR if i == selected_index else TEXT_COLOR
                 # Limita a exibição para não sobrepor o botão Sair
                 if y < 210:
-                    self.display.text(font, f"> {ssid[:25]}", 10, y, color, BG_COLOR)
+                    self.display.text(font, f"> {ssid[:38]}", 10, y, color, BG_COLOR)
 
             # Desenha o botão Sair
             is_exit_focused = (selected_index == len(ssids))

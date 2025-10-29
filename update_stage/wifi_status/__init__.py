@@ -7,6 +7,7 @@ automaticamente às redes salvas.
 
 import time
 import network
+import ntptime
 import st7789py as st7789
 from romfonts import vga1_8x8 as font
 
@@ -33,6 +34,22 @@ class App:
         self.draw_header(title)
         self.display.text(font, message, 10, 60, color, BG_COLOR)
         time.sleep(3)
+
+    def _sync_time(self):
+        """Tenta sincronizar o RTC via NTP e exibe o status."""
+        # Limpa a área de mensagens e exibe o status
+        self.display.fill_rect(0, 80, self.display.width, 40, BG_COLOR)
+        self.display.text(font, "Sincronizando hora...", 10, 80, TEXT_COLOR, BG_COLOR)
+        print("Tentando sincronizar a hora via NTP...")
+        try:
+            # ntptime.settime() pode levar alguns segundos e levanta uma exceção em caso de falha
+            ntptime.settime()
+            self.display.text(font, "Hora atualizada com sucesso!", 10, 100, SUCCESS_COLOR, BG_COLOR)
+            print("Hora sincronizada com sucesso.")
+        except Exception as e:
+            self.display.text(font, "Falha ao sincronizar hora.", 10, 100, ERROR_COLOR, BG_COLOR)
+            print(f"Falha ao sincronizar hora: {e}")
+        time.sleep(2) # Pausa para o usuário ler a mensagem
 
     def load_known_networks(self):
         """Carrega redes conhecidas do arquivo de texto."""
@@ -63,8 +80,8 @@ class App:
             self.draw_header("WiFi Status")
             self.display.text(font, f"Conectado a: {ssid}", 10, 40, SUCCESS_COLOR, BG_COLOR)
             self.display.text(font, f"IP: {ip}", 10, 60, SUCCESS_COLOR, BG_COLOR)
+            self._sync_time() # Sincroniza a hora
             # Mantém o WiFi ligado e sai
-            time.sleep(3)
             return
 
         # 2. Se não estiver conectado, tenta se conectar às redes salvas
@@ -92,7 +109,9 @@ class App:
         # 3. Exibe o resultado final
         if self.wlan.isconnected():
             ip = self.wlan.ifconfig()[0]
-            self.show_message("Sucesso!", f"IP: {ip}", SUCCESS_COLOR)
+            self.draw_header("Conectado!")
+            self.display.text(font, f"IP: {ip}", 10, 60, SUCCESS_COLOR, BG_COLOR)
+            self._sync_time() # Sincroniza a hora
         else:
             self.show_message("Falha!", "Nao conectou a nenhuma rede.", ERROR_COLOR)
             self.wlan.active(False) # Desliga o WiFi se falhou
