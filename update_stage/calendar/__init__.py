@@ -86,6 +86,40 @@ class CalendarApp:
                 except (ValueError, IndexError):
                     pass
 
+    def _confirm_delete_ui(self):
+        """Mostra uma UI de confirmação para apagar um evento."""
+        self.display.fill_rect(40, 80, 240, 80, BG_COLOR)
+        self.display.rect(40, 80, 240, 80, HEADER_COLOR)
+        self.display.text(font, "Apagar este evento?", 50, 95, TEXT_COLOR, BG_COLOR)
+        
+        confirm_focus = 'no' # 'yes' ou 'no'
+        
+        while True:
+            yes_color = HIGHLIGHT_COLOR if confirm_focus == 'yes' else TEXT_COLOR
+            no_color = HIGHLIGHT_COLOR if confirm_focus == 'no' else TEXT_COLOR
+            self.display.text(font, "[ Nao ]", 60, 130, no_color, BG_COLOR)
+            self.display.text(font, "[ Sim ]", 180, 130, yes_color, BG_COLOR)
+
+            direction, click = self.trackball.get_direction()
+            key = self.get_key_simple()
+
+            if direction:
+                if direction in ['left', 'right']:
+                    confirm_focus = 'yes' if confirm_focus == 'no' else 'no'
+                    self.sound.play_navigation()
+            
+            if click or (key and key == b'\r'):
+                self.sound.play_confirm()
+                # A tela de confirmação é limpa pelo redesenho do editor principal
+                return confirm_focus == 'yes'
+            
+            # Se o usuário pressionar qualquer outra tecla, cancela
+            if key and key != b'\r':
+                self.sound.play_navigation()
+                return False
+
+            time.sleep_ms(50)
+
     def _draw_event_editor(self, content, editor_focus):
         """Desenha a UI do editor de eventos."""
         # Limpa a área de texto e o rodapé
@@ -100,34 +134,54 @@ class CalendarApp:
         
         # Desenha o botão Salvar
         is_button_focused = (editor_focus == 'save_button')
-        button_color = HIGHLIGHT_COLOR if is_button_focused else TEXT_COLOR
-        self.display.text(font, "[ Salvar ]", 10, 225, button_color, BG_COLOR)
+        save_color = HIGHLIGHT_COLOR if is_button_focused else TEXT_COLOR
+        self.display.text(font, "[ Salvar ]", 10, 225, save_color, BG_COLOR)
+
+        # Desenha o botão Apagar
+        is_del_button_focused = (editor_focus == 'delete_button')
+        del_color = HIGHLIGHT_COLOR if is_del_button_focused else TEXT_COLOR
+        self.display.text(font, "[ Apagar ]", 100, 225, del_color, BG_COLOR)
 
     def _handle_event_editor_input(self, content, editor_focus, filepath):
         """Processa a entrada do usuário no editor de eventos."""
         key = self.get_key_simple()
         direction, click = self.trackball.get_direction()
 
-        # Navegação com Trackball (foco)
+        # --- Navegação de Foco ---
         if direction:
-            if direction == 'up' and editor_focus == 'save_button':
+            if direction == 'up' and editor_focus in ['save_button', 'delete_button']:
                 editor_focus = 'text'
                 self.sound.play_navigation()
             elif direction == 'down' and editor_focus == 'text':
                 editor_focus = 'save_button'
                 self.sound.play_navigation()
+            elif direction == 'left' and editor_focus == 'delete_button':
+                editor_focus = 'save_button'
+                self.sound.play_navigation()
+            elif direction == 'right' and editor_focus == 'save_button':
+                editor_focus = 'delete_button'
+                self.sound.play_navigation()
 
-        # Ação de Clique ou Enter no botão Salvar
-        if (click and editor_focus == 'save_button') or (key and key == b'\r' and editor_focus == 'save_button'):
+        # --- Ações ---
+        action_triggered = click or (key and key == b'\r')
+
+        if action_triggered and editor_focus == 'save_button':
             self.sound.play_confirm()
             try:
                 with open(filepath, 'w') as f:
                     f.write(content)
             except OSError: pass # Falha silenciosa
             return None, None, True # content, editor_focus, should_exit
+        
+        elif action_triggered and editor_focus == 'delete_button':
+            if self._confirm_delete_ui():
+                try:
+                    _os.remove(filepath)
+                except OSError: pass # Arquivo já não existia
+                return None, None, True # Sair após apagar
+            # Se não confirmou, o loop principal redesenha o editor
 
-        # Edição de texto
-        if key and editor_focus == 'text':
+        elif key and editor_focus == 'text': # Edição de texto
             if key == b'\r': content += '\n'
             elif key == b'\x08': content = content[:-1]
             else:
@@ -147,7 +201,7 @@ class CalendarApp:
                 content = f.read()
         except OSError: pass # Arquivo não existe ainda
 
-        editor_focus = 'text' # 'text' ou 'save_button'
+        editor_focus = 'text' # 'text', 'save_button', ou 'delete_button'
         self.draw_header(f"Evento: {day}/{month}/{year}")
 
         while True:

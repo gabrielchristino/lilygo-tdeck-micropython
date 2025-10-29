@@ -23,8 +23,8 @@ class NotepadApp:
         self.trackball = trackball
         self.i2c = i2c
         self.sound = sound
-        self.notes = []
-        self.focused_element = 'input'  # 'list', 'input', ou 'exit'
+        self.notes = [] # Lista de dicionários de notas
+        self.focused_element = 'input'  # 'list', 'input', 'delete_button', ou 'exit'
         self.selected_note_index = 0
         self.active_text = "" # Texto ativo na caixa de edição/criação
         self.editing_filename = None # Nome do arquivo que está sendo editado
@@ -73,12 +73,50 @@ class NotepadApp:
             self.load_notes() # Recarrega a lista de notas após salvar
         except OSError: pass # Falha silenciosa
 
+    def delete_note(self, filename):
+        """Apaga um arquivo de nota."""
+        if not filename: return
+        filepath = f"{NOTES_DIR}/{filename}"
+        try:
+            _os.remove(filepath)
+        except OSError: pass # Arquivo não existe, falha silenciosa
+
     def read_note_content(self, filename):
         """Lê o conteúdo de um arquivo de nota."""
         filepath = f"{NOTES_DIR}/{filename}"
         try:
             with open(filepath, 'r') as f: return f.read()
         except OSError: return ""
+
+    def _confirm_delete_ui(self):
+        """Mostra uma UI de confirmação para apagar uma nota."""
+        self.display.fill_rect(40, 80, 240, 80, BG_COLOR)
+        self.display.rect(40, 80, 240, 80, HIGHLIGHT_COLOR)
+        self.display.text(font, "Apagar esta nota?", 60, 95, TEXT_COLOR, BG_COLOR)
+        
+        confirm_focus = 'no' # 'yes' ou 'no'
+        while True:
+            yes_color = HIGHLIGHT_COLOR if confirm_focus == 'yes' else TEXT_COLOR
+            no_color = HIGHLIGHT_COLOR if confirm_focus == 'no' else TEXT_COLOR
+            self.display.text(font, "[ Nao ]", 60, 130, no_color, BG_COLOR)
+            self.display.text(font, "[ Sim ]", 180, 130, yes_color, BG_COLOR)
+
+            direction, click = self.trackball.get_direction()
+            key = self.get_key_simple()
+
+            if direction and direction in ['left', 'right']:
+                confirm_focus = 'yes' if confirm_focus == 'no' else 'no'
+                self.sound.play_navigation()
+            
+            if click or (key and key == b'\r'):
+                self.sound.play_confirm()
+                return confirm_focus == 'yes'
+            
+            if key and key != b'\r': # Qualquer outra tecla cancela
+                self.sound.play_navigation()
+                return False
+
+            time.sleep_ms(50)
 
     def draw_main_ui(self):
         """Desenha a UI principal com a lista de notas e a caixa de nova nota."""
@@ -96,9 +134,10 @@ class NotepadApp:
         # Desenha a caixa de entrada para nova nota
         is_input_focused = (self.focused_element == 'input')
         new_note_box_y = 200
-        input_width = self.display.width - 100 # Largura da caixa de texto
-        exit_button_x = input_width + 20 # Posição do botão Sair
-        self.display.text(font, "Nova Nota:", 10, new_note_box_y - 12, TEXT_COLOR, BG_COLOR)
+        input_width = self.display.width - 20
+        
+        label = "Editar Nota:" if self.editing_filename else "Nova Nota:"
+        self.display.text(font, label, 10, new_note_box_y - 12, TEXT_COLOR, BG_COLOR)
         
         # Desenha a caixa e a borda de foco
         self.display.fill_rect(10, new_note_box_y, input_width, 20, INPUT_BG_COLOR)
@@ -109,10 +148,20 @@ class NotepadApp:
             
         self.display.text(font, self.active_text, 15, new_note_box_y + 6, TEXT_COLOR, INPUT_BG_COLOR)
 
-        # Desenha o botão Sair
+        # --- Desenha os botões de ação ---
+        # Botão Apagar (só aparece durante a edição)
+        if self.editing_filename:
+            is_delete_focused = (self.focused_element == 'delete_button')
+            del_color = HIGHLIGHT_COLOR if is_delete_focused else TEXT_COLOR
+            self.display.text(font, "[ Apagar ]", 10, 225, del_color, BG_COLOR)
+
+        # Botão Sair
         is_exit_focused = (self.focused_element == 'exit')
-        color = HIGHLIGHT_COLOR if is_exit_focused else TEXT_COLOR
-        self.display.text(font, "[ Sair ]", exit_button_x, new_note_box_y + 6, color, BG_COLOR)
+        exit_color = HIGHLIGHT_COLOR if is_exit_focused else TEXT_COLOR
+        # Posição do botão Sair ajustada para o lado direito
+        exit_x = self.display.width - (len("[ Sair ]") * font.WIDTH) - 10
+        self.display.text(font, "[ Sair ]", exit_x, 225, exit_color, BG_COLOR)
+
 
     def run(self):
         """Loop principal do aplicativo."""
@@ -151,18 +200,36 @@ class NotepadApp:
                         elif direction == 'down':
                             self.selected_note_index += 1
                             if self.selected_note_index >= len(self.notes):
-                                self.focused_element = 'input' # Da lista para a caixa de texto
-                    elif self.focused_element in ['input', 'exit']:
-                        if direction == 'up': self.focused_element = 'list' # Da parte de baixo para a lista
-                        elif direction == 'left': self.focused_element = 'input'
+                                self.focused_element = 'input'
+                    elif self.focused_element == 'input':
+                        if direction == 'up': self.focused_element = 'list'
+                        elif direction == 'down':
+                            self.focused_element = 'delete_button' if self.editing_filename else 'exit'
+                    elif self.focused_element == 'delete_button':
+                        if direction == 'up': self.focused_element = 'input'
                         elif direction == 'right': self.focused_element = 'exit'
+                    elif self.focused_element == 'exit':
+                        if direction == 'up': self.focused_element = 'input'
+                        elif direction == 'left':
+                            self.focused_element = 'delete_button' if self.editing_filename else 'input'
 
                     self.sound.play_navigation()
                     break # Sai para redesenhar a seleção
 
-                # Processa o clique do trackball para Sair
-                if click and self.focused_element == 'exit':
-                    return # Termina o método run() e fecha o app
+                # Processa cliques do trackball
+                if click:
+                    if self.focused_element == 'exit':
+                        return # Fecha o app
+                    elif self.focused_element == 'delete_button' and self.editing_filename:
+                        if self._confirm_delete_ui():
+                            self.delete_note(self.editing_filename)
+                            self.active_text = ""
+                            self.editing_filename = None
+                            self.load_notes()
+                        break # Redesenha a tela
+                    elif self.focused_element == 'list':
+                        # A lógica de edição foi movida para baixo para unificar com o clique
+                        pass
 
                 # Processa o clique do trackball para editar uma nota
                 if click and self.focused_element == 'list':
