@@ -32,6 +32,8 @@ class SketchApp:
         # Estado do canvas de desenho
         self.cursor_x = self.display.width // 2
         self.cursor_y = self.display.height // 2
+        self.prev_touch_x = -1
+        self.prev_touch_y = -1
         
         # Buffer para o desenho (1-bit: 320*240 / 8 = 9600 bytes)
         # Usamos um buffer para não ter que ler da tela, o que é lento.
@@ -61,6 +63,33 @@ class SketchApp:
             self.draw_buffer[index] |= (1 << bit)
         else:
             self.draw_buffer[index] &= ~(1 << bit)
+
+    def _line_to_buffer(self, x0, y0, x1, y1, state):
+        """Desenha uma linha no buffer de 1-bit usando o algoritmo de Bresenham."""
+        steep = abs(y1 - y0) > abs(x1 - x0)
+        if steep:
+            x0, y0 = y0, x0
+            x1, y1 = y1, x1
+        if x0 > x1:
+            x0, x1 = x1, x0
+            y0, y1 = y1, y0
+        
+        dx = x1 - x0
+        dy = abs(y1 - y0)
+        err = dx // 2
+        ystep = 1 if y0 < y1 else -1
+        
+        while x0 <= x1:
+            if steep:
+                self._set_pixel_in_buffer(y0, x0, state)
+            else:
+                self._set_pixel_in_buffer(x0, y0, state)
+            
+            err -= dy
+            if err < 0:
+                y0 += ystep
+                err += dx
+            x0 += 1
 
     def _save_drawing(self):
         """Salva o buffer de desenho em um arquivo."""
@@ -97,6 +126,37 @@ class SketchApp:
             return True
         except OSError:
             return False
+
+    def _delete_drawing(self, filename):
+        """Apaga um arquivo de desenho do SD card."""
+        filepath = f"{SKETCH_DIR}/{filename}"
+        try:
+            _os.remove(filepath)
+            return True
+        except OSError:
+            return False
+
+    def _confirm_delete_ui(self):
+        """Mostra uma UI de confirmação para apagar um desenho, similar ao Notepad."""
+        self.display.fill_rect(40, 80, 240, 80, BG_COLOR)
+        self.display.rect(40, 80, 240, 80, HIGHLIGHT_COLOR)
+        self.display.text(font, "Apagar este desenho?", 60, 95, TEXT_COLOR, BG_COLOR)
+        
+        confirm_focus = 'no' # 'yes' ou 'no'
+        while True:
+            yes_color = HIGHLIGHT_COLOR if confirm_focus == 'yes' else TEXT_COLOR
+            no_color = HIGHLIGHT_COLOR if confirm_focus == 'no' else TEXT_COLOR
+            self.display.text(font, "[ Nao ]", 60, 130, no_color, BG_COLOR)
+            self.display.text(font, "[ Sim ]", 180, 130, yes_color, BG_COLOR)
+
+            direction, click = self.trackball.get_direction()
+
+            if direction and direction in ['left', 'right']:
+                confirm_focus = 'yes' if confirm_focus == 'no' else 'no'
+                self.sound.play_navigation()
+            elif click:
+                self.sound.play_confirm()
+                return confirm_focus == 'yes'
 
     # --- Telas (Modos) do Aplicativo ---
 
@@ -206,12 +266,38 @@ class SketchApp:
         if not self._load_drawing_to_display(filename):
             return # Falha ao carregar
         
-        # Aguarda um clique ou movimento para a direita para sair
+        focus = 'back' # 'back' ou 'delete'
+
+        def draw_buttons():
+            back_color = HIGHLIGHT_COLOR if focus == 'back' else TEXT_COLOR
+            delete_color = HIGHLIGHT_COLOR if focus == 'delete' else TEXT_COLOR
+            self.display.text(font, "[ Voltar ]", 10, 225, back_color, BG_COLOR)
+            self.display.text(font, "[ Apagar ]", self.display.width - 80, 225, delete_color, BG_COLOR)
+
+        draw_buttons()
+
         while True:
             direction, click = self.trackball.get_direction()
-            if click or direction == 'right':
+
+            if direction in ['left', 'right']:
+                focus = 'delete' if focus == 'back' else 'back'
                 self.sound.play_navigation()
-                return # Volta para o file browser
+                draw_buttons()
+
+            if click:
+                if focus == 'back':
+                    self.sound.play_navigation()
+                    return # Volta para o file browser
+                elif focus == 'delete':
+                    if self._confirm_delete_ui():
+                        self._delete_drawing(filename)
+                        self._load_saved_files() # Atualiza a lista de arquivos
+                        return # Volta para o file browser
+                    else:
+                        # Se cancelou, redesenha a tela de visualização
+                        self._load_drawing_to_display(filename)
+                        draw_buttons()
+
             time.sleep_ms(50)
 
     def run_drawing_canvas(self):
@@ -220,14 +306,24 @@ class SketchApp:
         self.draw_buffer = bytearray(len(self.draw_buffer))
         self.display.fill(BG_COLOR)
 
+        # Reseta as coordenadas do toque anterior ao entrar no modo de desenho
+        self.prev_touch_x = -1
+        self.prev_touch_y = -1
+
         while self.mode == 'drawing':
             # Lógica de Desenho por Toque
             event_type, tx, ty = self.touch.read()
             if event_type == self.touch.TAP or event_type == self.touch.DRAG:
-                # Desenha um pequeno círculo para um traço mais grosso e fácil
-                self.display.fill_circle(tx, ty, 2, DRAW_COLOR)
-                # Atualiza o buffer para os pixels desenhados (simplificado para o ponto central)
-                self._set_pixel_in_buffer(tx, ty, True)
+                if self.prev_touch_x != -1:
+                    # Se houver um ponto anterior, desenha uma linha até o ponto atual
+                    self.display.line(self.prev_touch_x, self.prev_touch_y, tx, ty, DRAW_COLOR) # Desenha na tela
+                    self._line_to_buffer(self.prev_touch_x, self.prev_touch_y, tx, ty, True) # Salva a linha no buffer
+                else:
+                    # Se for o primeiro ponto, apenas desenha um pixel
+                    self.display.pixel(tx, ty, DRAW_COLOR)
+                    self._set_pixel_in_buffer(tx, ty, True) # Salva o pixel no buffer
+                
+                self.prev_touch_x, self.prev_touch_y = tx, ty
 
             direction, click = self.trackball.get_direction()
 
