@@ -13,10 +13,11 @@ UPDATE_STAGE_DIR = 'update_stage'
 
 # --- Funções ---
 
-def run_command(command, ignore_not_found=False):
+def run_command(command, ignore_not_found=False, ignore_exists=False):
     """Executa um comando no terminal e imprime a saída."""
     print(f"Executando: {' '.join(command)}")
     try:
+        # Nota: Usamos check=True para levantar CalledProcessError em caso de falha.
         result = subprocess.run(command, check=True, capture_output=True, text=True)
         if result.stdout:
             print(result.stdout)
@@ -26,11 +27,19 @@ def run_command(command, ignore_not_found=False):
     except subprocess.CalledProcessError as e:
         print(f"Falha ao executar comando: {e}")
         print(f"Saída de erro:\n{e.stderr}")
-        # Se a flag ignore_not_found for True e o erro for "No such file or directory",
-        # consideramos que não é uma falha real e retornamos True.
+        
+        # 1. Tratamento para 'No such file or directory' (usado em 'rm -r')
         if ignore_not_found and "No such file or directory" in e.stderr:
             print("Info: O arquivo/diretório não existia, o que é esperado. Continuando...")
             return True
+        
+        # 2. Tratamento para 'File exists' (usado em 'mkdir')
+        if ignore_exists and "File exists" in e.stderr:
+            print("Info: O diretório já existia, o que é esperado. Continuando...")
+            return True
+            
+        # Se for o erro persistente de -r, ainda falha e retorna False para a cópia
+        # TODO: Se o problema de -r for resolvido, esta parte será executada
         return False
     except FileNotFoundError:
         print("Erro: 'mpremote' não encontrado. Certifique-se de que ele está instalado e no seu PATH.")
@@ -77,22 +86,46 @@ def discover_files():
 
 def upload_item(item):
     """Faz o upload de um único item (arquivo ou app) para o dispositivo."""
+    
+    # Padroniza para 'mpremote fs cp' para maior robustez
     if item['type'] == 'file':
-        # Comando para copiar um arquivo: mpremote cp local/arquivo.py :remoto/arquivo.py
-        command = ['mpremote', 'cp', item['local_path'], f":{item['remote_path']}"]
+        # Comando para copiar um arquivo: mpremote fs cp local/arquivo.py :remoto/arquivo.py
+        command = ['mpremote', 'fs', 'cp', item['local_path'], f":{item['remote_path']}"]
         return run_command(command)
     
     elif item['type'] == 'app':
         # Para um app, primeiro garantimos que o diretório de staging exista no dispositivo
         print(f"Preparando para subir o app '{item['name']}'...")
-        run_command(['mpremote', 'fs', 'mkdir', 'update_stage'])
         
-        # Depois, removemos a versão antiga do app no staging, se existir
+        # 1. Cria o diretório de staging (agora usa ignore_exists=True para sucesso)
+        # Se o comando falhar, mas for por 'File exists', ele retorna True e continua.
+        if not run_command(['mpremote', 'fs', 'mkdir', 'update_stage'], ignore_exists=True):
+            print("Erro fatal ao tentar criar ou verificar o diretório 'update_stage' remoto.")
+            return False
+
+        # 2. Removemos a versão antiga do app no staging, se existir (ignora 'No such file')
         run_command(['mpremote', 'fs', 'rm', '-r', f":{item['remote_path']}"], ignore_not_found=True)
         
-        # Finalmente, copiamos a pasta inteira do app
-        # Comando: mpremote cp -r local/pasta/app :remoto/pasta/app
-        command = ['mpremote', 'cp', '-r', item['local_path'], f":{item['remote_path']}"]
+        # 3. Garantimos que o diretório do app exista no dispositivo antes de copiar o conteúdo
+        run_command(['mpremote', 'fs', 'mkdir', f":{item['remote_path']}"], ignore_exists=True)
+        
+        # 4. Copiamos o CONTEÚDO da pasta do app (solução robusta sem depender do shell)
+        local_dir = item['local_path'] # Ex: 'update_stage/sketch'
+        remote_dir = f":{item['remote_path']}" # Ex: ':update_stage/sketch'
+
+        # Lista todos os itens dentro do diretório local
+        local_items_to_copy = os.listdir(local_dir)
+
+        # Constrói a lista de caminhos de ORIGEM
+        sources = [os.path.join(local_dir, f) for f in local_items_to_copy]
+
+        # O DESTINO é sempre o último argumento
+        destination = [remote_dir]
+
+        # O comando completo será: mpremote fs cp -r [sources...] [destination]
+        # Note que a flag '-r' ainda é necessária se houver subdiretórios no app!
+        command = ['mpremote', 'fs', 'cp', '-r'] + sources + destination
+
         return run_command(command)
     
     return False
