@@ -213,10 +213,12 @@ class AppLauncher:
             # Lida com a entrada do trackball
             if direction:
                 old_selected_index = self.selected_index
+                num_apps = len(self.apps)
+
                 if direction == 'up':
-                    self.selected_index = max(0, self.selected_index - 1)
+                    self.selected_index = (self.selected_index - 1 + num_apps) % num_apps
                 elif direction == 'down':
-                    self.selected_index = min(len(self.apps) - 1, self.selected_index + 1)
+                    self.selected_index = (self.selected_index + 1) % num_apps
                 
                 if self.selected_index != old_selected_index:
                     self.sound.play_navigation()

@@ -102,62 +102,102 @@ class SketchApp:
 
     def run_main_menu(self):
         """Tela do menu principal."""
-        menu_items = ["Novo Desenho", "Ver Salvos"]
+        menu_items = ["Novo Desenho", "Ver Salvos", "[ Sair ]"]
         self.selected_index = 0
 
-        while self.mode == 'main_menu':
+        # Função auxiliar para desenhar o menu e evitar repetição de código
+        def draw_menu():
             self.display.fill(BG_COLOR)
             self.display.text(font, "App de Desenho", 10, 10, TEXT_COLOR, BG_COLOR)
-            
             for i, item in enumerate(menu_items):
                 color = HIGHLIGHT_COLOR if i == self.selected_index else TEXT_COLOR
-                self.display.text(font, item, 40, 80 + i * 30, color, BG_COLOR)
+                self.display.text(font, item, 40, 60 + i * 30, color, BG_COLOR)
 
+        draw_menu() # Desenha o menu uma vez no início
+
+        while self.mode == 'main_menu':
             direction, click = self.trackball.get_direction()
+            
             if direction in ['up', 'down']:
-                self.selected_index = 1 - self.selected_index # Alterna entre 0 e 1
+                if direction == 'up':
+                    self.selected_index = (self.selected_index - 1 + len(menu_items)) % len(menu_items)
+                else: # down
+                    self.selected_index = (self.selected_index + 1) % len(menu_items)
                 self.sound.play_navigation()
+                draw_menu() # Redesenha o menu apenas quando a seleção muda
             
             if click:
                 self.sound.play_confirm()
                 if self.selected_index == 0:
                     self.mode = 'drawing'
-                else:
+                elif self.selected_index == 1:
                     self._load_saved_files()
                     self.mode = 'file_browser'
+                elif self.selected_index == 2:
+                    self.mode = 'exit' # Sinaliza para o loop principal sair
             
             time.sleep_ms(50)
 
     def run_file_browser(self):
         """Tela para visualizar arquivos salvos."""
         self.selected_index = 0
-        
-        while self.mode == 'file_browser':
-            self.display.fill(BG_COLOR)
-            self.display.text(font, "Desenhos Salvos (Voltar=Direita)", 10, 10, TEXT_COLOR, BG_COLOR)
+        old_selected_index = -1
 
-            if not self.saved_files:
-                self.display.text(font, "Nenhum desenho salvo.", 10, 50, TEXT_COLOR, BG_COLOR)
+        # Função auxiliar para desenhar um item da lista
+        def draw_list_item(index, is_selected):
+            color = HIGHLIGHT_COLOR if is_selected else TEXT_COLOR
+            y_pos = 60 + index * 30 # Posição e espaçamento padronizados
+            
+            if index < len(self.saved_files):
+                # É um arquivo de desenho
+                text = self.saved_files[index].replace('.sketch', '')
+                self.display.text(font, text[:30], 40, y_pos, color, BG_COLOR) # Recuo padronizado
             else:
-                for i, filename in enumerate(self.saved_files):
-                    if i > 10: break # Limita a exibição
-                    color = HIGHLIGHT_COLOR if i == self.selected_index else TEXT_COLOR
-                    self.display.text(font, filename.replace('.sketch', ''), 10, 40 + i * 15, color, BG_COLOR)
+                # É o botão "Voltar"
+                self.display.text(font, "[ Voltar ]", 40, y_pos, color, BG_COLOR) # Recuo padronizado
 
+        # Desenha a tela inicial uma vez
+        self.display.fill(BG_COLOR)
+        self.display.text(font, "Desenhos Salvos", 10, 10, TEXT_COLOR, BG_COLOR)
+
+        if not self.saved_files:
+            self.display.text(font, "Nenhum desenho salvo.", 10, 50, TEXT_COLOR, BG_COLOR)
+        
+        # Desenha todos os itens da lista inicialmente
+        for i in range(len(self.saved_files) + 1): # +1 para o botão Voltar
+            if i > 10: break
+            draw_list_item(i, i == self.selected_index)
+
+        while self.mode == 'file_browser':
             direction, click = self.trackball.get_direction()
-            if direction == 'up':
-                self.selected_index = max(0, self.selected_index - 1)
-                self.sound.play_navigation()
-            elif direction == 'down':
-                self.selected_index = min(len(self.saved_files) - 1, self.selected_index + 1)
-                self.sound.play_navigation()
-            elif direction == 'right': # Sair do browser
-                self.mode = 'main_menu'
-                self.sound.play_navigation()
 
-            if click and self.saved_files:
-                self.sound.play_confirm()
-                self.run_viewing_canvas(self.saved_files[self.selected_index])
+            if direction:
+                old_selected_index = self.selected_index
+                if direction == 'up':
+                    self.selected_index = max(0, self.selected_index - 1)
+                elif direction == 'down':
+                    # O limite agora é o número de arquivos + o botão Voltar
+                    self.selected_index = min(len(self.saved_files), self.selected_index + 1)
+                
+                if old_selected_index != self.selected_index:
+                    self.sound.play_navigation()
+                    # Redesenha apenas os itens afetados para evitar piscar
+                    draw_list_item(old_selected_index, False) # Apaga o highlight antigo
+                    draw_list_item(self.selected_index, True)  # Desenha o novo highlight
+
+            if click:
+                if self.selected_index < len(self.saved_files): # Clicou em um arquivo
+                    self.sound.play_confirm()
+                    self.run_viewing_canvas(self.saved_files[self.selected_index])
+                    # Após voltar, redesenha a tela do browser
+                    self.display.fill(BG_COLOR)
+                    self.display.text(font, "Desenhos Salvos", 10, 10, TEXT_COLOR, BG_COLOR)
+                    for i in range(len(self.saved_files) + 1):
+                        if i > 5: break # Limita a 5 itens visíveis para não sobrepor o texto inferior
+                        draw_list_item(i, i == self.selected_index)
+                else: # Clicou em "Voltar"
+                    self.sound.play_navigation()
+                    self.mode = 'main_menu'
 
             time.sleep_ms(50)
 
@@ -179,61 +219,31 @@ class SketchApp:
         # Limpa o buffer e a tela
         self.draw_buffer = bytearray(len(self.draw_buffer))
         self.display.fill(BG_COLOR)
-        self.display.text(font, "Direita=Sair/Salvar", 10, 230, TEXT_COLOR, BG_COLOR)
-        
-        last_cursor_x, last_cursor_y = self.cursor_x, self.cursor_y
-        is_drawing = False
 
         while self.mode == 'drawing':
-            # Apaga o cursor antigo (desenhando um pixel da cor de fundo)
-            self.display.pixel(last_cursor_x, last_cursor_y, BG_COLOR)
-            # Se o cursor estava sobre um pixel desenhado, redesenha-o
-            index = (last_cursor_y * self.display.width + last_cursor_x) // 8
-            bit = 7 - ((last_cursor_y * self.display.width + last_cursor_x) % 8)
-            if (self.draw_buffer[index] >> bit) & 1:
-                self.display.pixel(last_cursor_x, last_cursor_y, DRAW_COLOR)
-
-            # --- NOVO: Lógica de Desenho por Toque ---
+            # Lógica de Desenho por Toque
             event_type, tx, ty = self.touch.read()
             if event_type == self.touch.TAP or event_type == self.touch.DRAG:
                 # Desenha um pequeno círculo para um traço mais grosso e fácil
                 self.display.fill_circle(tx, ty, 2, DRAW_COLOR)
                 # Atualiza o buffer para os pixels desenhados (simplificado para o ponto central)
                 self._set_pixel_in_buffer(tx, ty, True)
-                # O som de toque pode ser muito repetitivo, então é opcional
-                # self.sound.play_keypress()
 
             direction, click = self.trackball.get_direction()
 
-            # Movimento do cursor
-            if direction == 'up': self.cursor_y = max(0, self.cursor_y - 1)
-            elif direction == 'down': self.cursor_y = min(self.display.height - 1, self.cursor_y + 1)
-            elif direction == 'left': self.cursor_x = max(0, self.cursor_x - 1)
-            elif direction == 'right':
-                # Sair e salvar
+            # Lógica para salvar e sair com um clique
+            if click:
                 self.sound.play_confirm()
                 if self._save_drawing():
                     self.display.text(font, "Salvo!", 200, 230, st7789.GREEN, BG_COLOR)
                 else:
                     self.display.text(font, "Falha!", 200, 230, st7789.RED, BG_COLOR)
-                time.sleep(1)
+                time.sleep_ms(1000)
                 self.mode = 'main_menu'
                 return
 
-            # Lógica de desenho
-            if click:
-                is_drawing = not is_drawing # Alterna o modo de desenho
-                self.sound.play_keypress()
-
-            if is_drawing:
-                self._set_pixel_in_buffer(self.cursor_x, self.cursor_y, True)
-                self.display.pixel(self.cursor_x, self.cursor_y, DRAW_COLOR)
-
-            # Desenha o novo cursor
-            self.display.pixel(self.cursor_x, self.cursor_y, CURSOR_COLOR)
-            last_cursor_x, last_cursor_y = self.cursor_x, self.cursor_y
-
-            time.sleep_ms(10) # Delay pequeno para um movimento mais fluido
+            # Um pequeno delay para não sobrecarregar a CPU
+            time.sleep_ms(20)
 
     def run(self):
         """Ponto de entrada principal do aplicativo."""
@@ -242,8 +252,10 @@ class SketchApp:
                 self.run_main_menu()
             elif self.mode == 'file_browser':
                 self.run_file_browser()
-            elif self.mode == 'drawing':
+            elif self.mode == 'drawing': # type: ignore
                 self.run_drawing_canvas()
+            elif self.mode == 'exit':
+                break # Sai do loop principal do app
             else: # Se o modo for desconhecido, volta ao menu
                 self.mode = 'main_menu'
 
